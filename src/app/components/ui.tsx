@@ -12,6 +12,7 @@ export const RUN_STATUS: Record<string, { label: string; tone: string }> = {
 export const STEP_STATUS: Record<string, { label: string; tone: string }> = {
   ready: { label: "в черзі", tone: "" },
   running: { label: "виконується", tone: "active" },
+  awaiting_agent: { label: "чекає на Claude", tone: "wait" },
   succeeded: { label: "готово", tone: "ok" },
   failed: { label: "помилка", tone: "bad" },
   cancelled: { label: "скасовано", tone: "" },
@@ -37,6 +38,7 @@ export const ACTIVITY: Record<string, string> = {
   reviewing: "Перевіряє",
   waiting_approval: "Чекає на ваше рішення",
   unassigned: "Ще без задач",
+  awaiting_agent: "Чекає на запуск Claude",
   awaiting_bridge: "Чекає на міст",
   blocked: "Заблокований",
 };
@@ -61,6 +63,14 @@ export const ROLE_LABEL: Record<string, string> = {
 export function StatusPill({ status, map = RUN_STATUS }: { status: string; map?: Record<string, { label: string; tone: string }> }) {
   const s = map[status] ?? { label: status, tone: "" };
   return <span className={`pill ${s.tone}`}>{s.label}</span>;
+}
+
+export function ProviderBadge({ provider }: { provider: string | null | undefined }) {
+  if (provider === "session") {
+    return <span className="pill" title="Тексти пише Claude у сесії, яку запускає власник">Claude-сесія</span>;
+  }
+  if (provider === "stub") return <StubBadge />;
+  return null;
 }
 
 export function StubBadge() {

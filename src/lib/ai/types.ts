@@ -32,7 +32,7 @@ export interface GenerateResult<T> {
   provider: ProviderName;
 }
 
-export type ProviderName = "stub" | "anthropic";
+export type ProviderName = "stub" | "anthropic" | "session";
 
 export interface AiProvider {
   readonly name: ProviderName;

@@ -1,5 +1,7 @@
 import type postgres from "postgres";
 import type { AiProvider } from "@/lib/ai/types";
+import { AgentNeededError } from "@/lib/ai/session";
+import { providerForStep } from "@/lib/ai";
 import { executeStep } from "./registry";
 import type { StepContext, StepRow } from "./types";
 
@@ -19,6 +21,7 @@ export interface TickReport {
   retried: number;
   failed: number;
   rejected: number;
+  parked: number;
 }
 
 /**
@@ -32,7 +35,7 @@ export async function tick(sql: postgres.Sql, ai: AiProvider, opts: TickOptions)
   const maxSteps = opts.maxSteps ?? 10;
   const lease = opts.leaseSeconds ?? 120;
   const log = opts.log ?? (() => {});
-  const report: TickReport = { claimed: 0, succeeded: 0, retried: 0, failed: 0, rejected: 0 };
+  const report: TickReport = { claimed: 0, succeeded: 0, retried: 0, failed: 0, rejected: 0, parked: 0 };
 
   while (report.claimed < maxSteps && Date.now() - started < budget) {
     const rows = await sql<StepRow[]>`select * from office.worker_claim(${opts.workerId}, 1, ${lease})`;
@@ -48,7 +51,7 @@ export async function tick(sql: postgres.Sql, ai: AiProvider, opts: TickOptions)
 
     try {
       const [{ ctx }] = await sql<{ ctx: StepContext }[]>`select office.worker_context(${step.id}) as ctx`;
-      const result = await executeStep(ctx, ai);
+      const result = await executeStep(ctx, providerForStep(ai, step.agent_response));
       const [{ r }] = await sql<{ r: { accepted: boolean; reason?: string } }[]>`
         select office.worker_complete(${step.id}, ${opts.workerId}, ${step.attempt}, ${sql.json(result as never)}) as r`;
       if (r.accepted) report.succeeded++;
@@ -57,6 +60,11 @@ export async function tick(sql: postgres.Sql, ai: AiProvider, opts: TickOptions)
         log("completion rejected", { step: step.id, reason: r.reason });
       }
     } catch (e) {
+      if (e instanceof AgentNeededError) {
+        await sql`select office.worker_park(${step.id}, ${opts.workerId}, ${step.attempt}, ${sql.json(e.request as never)})`;
+        report.parked++;
+        continue;
+      }
       const err = e as Error & { retryable?: boolean };
       const retryable = err.retryable === true;
       const message = (err.message || String(e)).slice(0, 1500);

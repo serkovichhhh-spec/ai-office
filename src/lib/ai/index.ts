@@ -1,5 +1,6 @@
 import { AnthropicProvider, DEFAULT_MODELS, DEFAULT_PRICES } from "./anthropic";
 import { StubProvider } from "./stub";
+import { SessionProvider, type AgentResponse } from "./session";
 import type { AiProvider } from "./types";
 
 /** Selects the provider from env. Anything other than an explicit, keyed "anthropic" is the stub. */
@@ -15,7 +16,14 @@ export function providerFromEnv(env: NodeJS.ProcessEnv = process.env): AiProvide
     };
     return new AnthropicProvider({ apiKey: env.ANTHROPIC_API_KEY, models, prices: DEFAULT_PRICES });
   }
+  if (env.AI_PROVIDER === "session") return new SessionProvider(null);
   return new StubProvider();
 }
 
+/** Session mode needs the step's own submitted answer; other providers are shared. */
+export function providerForStep(base: AiProvider, agentResponse: AgentResponse | null | undefined): AiProvider {
+  return base.name === "session" ? new SessionProvider(agentResponse ?? null) : base;
+}
+
 export * from "./types";
+export { AgentNeededError, SessionProvider } from "./session";

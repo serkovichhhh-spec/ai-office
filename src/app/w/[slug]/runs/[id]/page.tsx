@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/supabase";
 import { runDetail, stepLabel, workspaceBySlug, type RunDetail } from "@/lib/queries";
 import { LiveRefresh } from "../../../../components/LiveRefresh";
-import { HANDOFF_STATUS, ROLE_LABEL, STEP_STATUS, StatusPill, StubBadge, clock, usd, when } from "../../../../components/ui";
+import { HANDOFF_STATUS, ROLE_LABEL, STEP_STATUS, ProviderBadge, StatusPill, StubBadge, clock, usd, when } from "../../../../components/ui";
 import { cancelRunAction } from "../../../../actions";
 import { DecisionPanel } from "./DecisionPanel";
 
@@ -28,6 +28,8 @@ const EVENT_TEXT: Record<string, (e: RunDetail["events"][number]) => string> = {
   "run.cancelled": () => "Запуск скасовано",
   "run.budget_exceeded": () => "Зупинено: вичерпано бюджет",
   "run.max_steps": () => "Зупинено: забагато кроків",
+  "step.awaiting_agent": (e) => `${role(e.agent_role)}: ${stepLabel(String(e.payload.step))} чекає на Claude-сесію${e.payload.note ? " (повтор: відповідь не пройшла перевірку)" : ""}`,
+  "step.agent_submitted": (e) => `${role(e.agent_role)}: Claude передав результат — ${stepLabel(String(e.payload.step))}`,
 };
 const DECISION: Record<string, string> = { approved: "затверджено", rejected: "відхилено", revision_requested: "на доопрацювання" };
 const KIND: Record<string, string> = { strategy: "стратегія", scripts: "сценарії", review: "рев'ю", deliverable: "пакет" };
@@ -48,6 +50,7 @@ export default async function RunPage({ params }: { params: Promise<{ slug: stri
   if (!ws || !d || d.run.workspace_id !== ws.id) notFound();
 
   const active = ["queued", "running"].includes(d.run.status);
+  const awaitingAgent = d.steps.some((s) => s.status === "awaiting_agent");
   const deliverables = d.artifacts.filter((a) => a.kind === "deliverable");
   const latest = deliverables.at(-1) ?? null;
   const isStub = d.artifacts.some((a) => a.provider === "stub") || d.run.provider === "stub";
@@ -67,7 +70,7 @@ export default async function RunPage({ params }: { params: Promise<{ slug: stri
       <div className="run-head">
         <h1>{d.brief.title}</h1>
         <div className="meta">
-          {isStub && <StubBadge />}
+          {isStub ? <StubBadge /> : <ProviderBadge provider={d.run.provider} />}
           <StatusPill status={d.run.status} />
           {canCancel && (
             <form action={cancelRunAction}>
@@ -88,6 +91,11 @@ export default async function RunPage({ params }: { params: Promise<{ slug: stri
       {isStub && (
         <p className="notice" style={{ marginTop: 16 }}>
           Модель не підключена: тексти нижче — шаблони, щоб перевірити процес. Черга, кроки, версії, затвердження й передача в продакшн — справжні.
+        </p>
+      )}
+      {awaitingAgent && (
+        <p className="notice" style={{ marginTop: 16 }} role="status">
+          Наступний крок чекає на Claude. Запусти задачу «AI Office: відпрацювати чергу» в Claude або напиши в чаті «запусти офіс» — сторінка оновиться сама.
         </p>
       )}
       {d.run.status === "failed" && (
@@ -165,7 +173,7 @@ export default async function RunPage({ params }: { params: Promise<{ slug: stri
                         {s.error && <div className="error small">{s.error}</div>}</td>
                       <td>{role(s.agent_role)}</td>
                       <td><StatusPill status={s.status} map={STEP_STATUS} /></td>
-                      <td>{s.provider === "code" ? "код" : s.model ?? "—"}</td>
+                      <td>{s.provider === "code" ? "код" : s.model === "claude-session" ? "Claude-сесія" : s.model ?? "—"}</td>
                       <td>{s.provider === "code" ? "—" : usd(s.cost_usd)}</td>
                       <td className="muted">{s.started_at ? clock(s.started_at) : "—"}</td>
                     </tr>

@@ -53,6 +53,7 @@ export interface Floor {
   agents: AgentState[];
   legacy: LegacyRun[] | null;
   spentToday: string;
+  awaitingAgent: number;
 }
 
 /** Team state is computed from steps/runs in the database; nothing here is simulated. */
@@ -66,6 +67,10 @@ export async function floorState(userId: string, ws: Workspace): Promise<Floor> 
       select s.agent_role, s.step_key, s.run_id, b.title from office.steps s
       join office.runs r on r.id = s.run_id join office.briefs b on b.id = r.brief_id
       where s.workspace_id = ${ws.id} and s.status = 'running'`;
+    const awaiting = await tx<{ agent_role: string; step_key: string; run_id: string; title: string }[]>`
+      select s.agent_role, s.step_key, s.run_id, b.title from office.steps s
+      join office.runs r on r.id = s.run_id join office.briefs b on b.id = r.brief_id
+      where s.workspace_id = ${ws.id} and s.status = 'awaiting_agent' and r.status = 'running'`;
     const queued = await tx<{ agent_role: string; run_id: string; title: string }[]>`
       select s.agent_role, s.run_id, b.title from office.steps s
       join office.runs r on r.id = s.run_id join office.briefs b on b.id = r.brief_id
@@ -88,6 +93,10 @@ export async function floorState(userId: string, ws: Workspace): Promise<Floor> 
       if (run) {
         return { ...a, activity: activityFor(a.role_key), detail: `${stepLabel(run.step_key)} · ${run.title}`, run_id: run.run_id };
       }
+      const parked = awaiting.find((r) => r.agent_role === a.role_key);
+      if (parked) {
+        return { ...a, activity: "awaiting_agent", detail: `${stepLabel(parked.step_key)} · ${parked.title}`, run_id: parked.run_id };
+      }
       if (a.role_key === "orchestrator" && waiting.length) {
         return { ...a, activity: "waiting_approval", detail: `Чекає на рішення: ${waiting[0].title}`, run_id: waiting[0].run_id };
       }
@@ -107,7 +116,7 @@ export async function floorState(userId: string, ws: Workspace): Promise<Floor> 
       legacy = await tx<LegacyRun[]>`select id::text, agent, status, started_at, finished_at, summary, stale
                                      from office.legacy_agent_runs(${ws.id}, 8)`;
     }
-    return { agents: state, legacy, spentToday: spent };
+    return { agents: state, legacy, spentToday: spent, awaitingAgent: awaiting.length };
   });
 }
 

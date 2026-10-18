@@ -4,7 +4,7 @@ import { requireUser } from "@/lib/supabase";
 import { floorState, listHandoffs, listRuns, workspaceBySlug } from "@/lib/queries";
 import { PixelAvatar } from "../../components/PixelAvatar";
 import { LiveRefresh } from "../../components/LiveRefresh";
-import { ACTIVITY, HANDOFF_STATUS, StatusPill, StubBadge, usd, when } from "../../components/ui";
+import { ACTIVITY, HANDOFF_STATUS, ProviderBadge, StatusPill, StubBadge, usd, when } from "../../components/ui";
 import { BriefForm } from "./BriefForm";
 
 export const dynamic = "force-dynamic";
@@ -25,16 +25,22 @@ export default async function OfficePage({ params }: { params: Promise<{ slug: s
   const active = runs.some((r) => r.status === "queued" || r.status === "running");
   const waiting = runs.filter((r) => r.status === "needs_approval");
   const canBrief = ws.role !== "viewer";
-  const stubMode = process.env.AI_PROVIDER !== "anthropic";
+  const providerMode = process.env.AI_PROVIDER ?? "stub";
 
   return (
     <>
       <LiveRefresh active={active} />
+      {floor.awaitingAgent > 0 && (
+        <p className="notice" style={{ marginBottom: 16 }} role="status">
+          {floor.awaitingAgent === 1 ? "1 крок чекає" : `${floor.awaitingAgent} кроки чекають`} на Claude. Запусти в Claude задачу
+          «AI Office: відпрацювати чергу» (Scheduled tasks → Run now) або напиши в чаті «запусти офіс».
+        </p>
+      )}
       <section className="floor" aria-labelledby="floor-title">
         <div className="floor-head">
           <h2 id="floor-title">Маркетинговий відділ {ws.name}</h2>
           <span className="muted small" style={{ background: "var(--paper)", paddingLeft: 6 }}>
-            Витрачено сьогодні {usd(floor.spentToday)} з {usd(ws.daily_budget_usd)} {stubMode && <StubBadge />}
+            Витрачено сьогодні {usd(floor.spentToday)} з {usd(ws.daily_budget_usd)} {providerMode === "stub" && <StubBadge />}{providerMode === "session" && <ProviderBadge provider="session" />}
           </span>
         </div>
         {(["marketing", "production"] as const).map((dept) => {
@@ -98,7 +104,7 @@ export default async function OfficePage({ params }: { params: Promise<{ slug: s
                           {r.status === "failed" && r.error_message ? `, ${r.error_message}` : ""}
                         </div>
                       </div>
-                      {r.provider === "stub" && <StubBadge />}
+                      <ProviderBadge provider={r.provider} />
                       <StatusPill status={r.status} />
                     </a>
                   </li>

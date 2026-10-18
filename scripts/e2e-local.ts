@@ -12,6 +12,7 @@ import postgres from "postgres";
 import { asUser, createSql } from "../src/lib/db-core";
 import { StubProvider } from "../src/lib/ai/stub";
 import { tick } from "../src/lib/orchestrator/worker";
+import { SessionProvider } from "../src/lib/ai/session";
 
 const ROOT = join(import.meta.dirname, "..");
 const ADMIN_URL = process.env.E2E_ADMIN_URL ?? "postgres://postgres@localhost:5432/postgres";
@@ -105,6 +106,37 @@ async function main() {
     check("idle tick claims nothing", idle.claimed === 0, idle);
     const events = await su`select kind from office.events where run_id = ${runId} order by id`;
     console.log(`events: ${events.map((e) => e.kind).join(" → ")}`);
+
+    // 6. Session mode: AI steps are parked for a Claude session, then resumed with its answer.
+    const sRun = await asUser(app, OWNER, async (tx) => {
+      const [{ id: b }] = await tx`select office.create_brief(${ws}, ${tx.json({ title: "Сесійний бриф", objective: "Перевірка режиму Claude-сесії", deliverable_count: 1 })}) as id`;
+      const [{ id }] = await tx`select office.submit_brief(${b}, 'e2e-session-0001') as id`;
+      return id as string;
+    });
+    const session = new SessionProvider(null);
+    const stubAnswers = new StubProvider();
+    let rounds = 0;
+    for (; rounds < 8; rounds++) {
+      await tick(app, session, { workerId: "e2e-session" });
+      const [r] = await su`select status from office.runs where id = ${sRun}`;
+      if (r.status === "needs_approval") break;
+      const pending = await app`select * from office.agent_pending(5)`;
+      check(`round ${rounds + 1}: one step awaits Claude`, pending.length === 1, pending.map((p) => p.step_key));
+      const req = pending[0].request as { schemaName: string; jsonSchema: object; system: string; user: string };
+      check(`round ${rounds + 1}: request carries schema and prompts`, Boolean(req.jsonSchema && req.system && req.user.includes("<brief>")));
+      // Stand-in for the Claude session: answer with the stub template for that schema.
+      const { reelsConcepts } = await import("../src/lib/orchestrator/playbooks/reels-concepts");
+      const [{ ctx }] = await su`select office.worker_context(${pending[0].step_id}) as ctx`;
+      let answer: unknown = null;
+      await reelsConcepts.execute(ctx as never, { name: "stub", generate: async (g: import("../src/lib/ai/types").GenerateRequest<unknown>) => { answer = g.stub(); return stubAnswers.generate(g); } } as never).catch(() => {});
+      const [{ r: sub }] = await app`select office.agent_submit(${pending[0].step_id}, ${app.json(answer as never)}) as r`;
+      check(`round ${rounds + 1}: submit accepted`, (sub as { accepted: boolean }).accepted);
+    }
+    const [sr] = await su`select status, provider, steps_executed from office.runs where id = ${sRun}`;
+    check("session run reaches approval after 3 Claude hand-offs", sr.status === "needs_approval" && rounds === 3, { ...sr, rounds });
+    check("session run labelled as Claude session", sr.provider === "session", sr);
+    const sArts = await su`select kind, provider, model from office.artifacts where run_id = ${sRun} and kind <> 'deliverable'`;
+    check("session artifacts carry claude-session model", sArts.every((a) => a.provider === "session" && a.model === "claude-session"), sArts);
     await app.end();
   } finally {
     await su.end();

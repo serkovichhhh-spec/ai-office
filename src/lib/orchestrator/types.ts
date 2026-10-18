@@ -7,6 +7,7 @@ export interface StepRow {
   cycle: number;
   attempt: number;
   input: Record<string, unknown>;
+  agent_response?: { schemaName: string; output: unknown } | null;
 }
 
 export interface BriefRow {
