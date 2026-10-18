@@ -2,6 +2,13 @@ import "server-only";
 import { asUser, db } from "./db";
 import { PLAYBOOKS } from "./orchestrator/registry";
 
+export const EXECUTOR_LABEL: Record<string, string> = { claude_session: "Claude", chatgpt: "ChatGPT", human: "людину" };
+
+function hhmm(ts: string | null): string {
+  if (!ts) return "—";
+  return new Date(ts).toLocaleTimeString("uk-UA", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Kyiv" });
+}
+
 export type Role = "owner" | "approver" | "editor" | "viewer";
 
 export interface Workspace {
@@ -54,6 +61,8 @@ export interface Floor {
   legacy: LegacyRun[] | null;
   spentToday: string;
   awaitingAgent: number;
+  /** Unclaimed parked steps per executor kind, e.g. { chatgpt: 1 }. */
+  waitingByExecutor: Record<string, number>;
 }
 
 /** Team state is computed from steps/runs in the database; nothing here is simulated. */
@@ -67,9 +76,17 @@ export async function floorState(userId: string, ws: Workspace): Promise<Floor> 
       select s.agent_role, s.step_key, s.run_id, b.title from office.steps s
       join office.runs r on r.id = s.run_id join office.briefs b on b.id = r.brief_id
       where s.workspace_id = ${ws.id} and s.status = 'running'`;
-    const awaiting = await tx<{ agent_role: string; step_key: string; run_id: string; title: string }[]>`
-      select s.agent_role, s.step_key, s.run_id, b.title from office.steps s
+    const awaiting = await tx<{ agent_role: string; step_key: string; run_id: string; title: string; executor: string;
+                                claimed_by: string | null; claimed_at: string | null; lease_until: string | null }[]>`
+      select s.agent_role, s.step_key, s.run_id, b.title, coalesce(s.executor, 'claude_session') as executor,
+             x.name as claimed_by, x.claimed_at::text, x.lease_expires_at::text as lease_until
+      from office.steps s
       join office.runs r on r.id = s.run_id join office.briefs b on b.id = r.brief_id
+      left join lateral (
+        select e.name, a.claimed_at, a.lease_expires_at from office.execution_attempts a
+        join office.executors e on e.id = a.executor_id
+        where a.step_id = s.id and a.state = 'claimed' and a.lease_expires_at > now()
+        order by a.claimed_at desc limit 1) x on true
       where s.workspace_id = ${ws.id} and s.status = 'awaiting_agent' and r.status = 'running'`;
     const queued = await tx<{ agent_role: string; run_id: string; title: string }[]>`
       select s.agent_role, s.run_id, b.title from office.steps s
@@ -95,7 +112,11 @@ export async function floorState(userId: string, ws: Workspace): Promise<Floor> 
       }
       const parked = awaiting.find((r) => r.agent_role === a.role_key);
       if (parked) {
-        return { ...a, activity: "awaiting_agent", detail: `${stepLabel(parked.step_key)} · ${parked.title}`, run_id: parked.run_id };
+        // Honest: an external executor is never shown as "working" — only who claimed it and until when.
+        const who = parked.claimed_by
+          ? `взяв ${parked.claimed_by} о ${hhmm(parked.claimed_at)}, оренда до ${hhmm(parked.lease_until)}`
+          : `чекає на ${EXECUTOR_LABEL[parked.executor] ?? parked.executor}`;
+        return { ...a, activity: "awaiting_agent", detail: `${stepLabel(parked.step_key)} · ${parked.title} — ${who}`, run_id: parked.run_id };
       }
       if (a.role_key === "orchestrator" && waiting.length) {
         return { ...a, activity: "waiting_approval", detail: `Чекає на рішення: ${waiting[0].title}`, run_id: waiting[0].run_id };
@@ -116,7 +137,8 @@ export async function floorState(userId: string, ws: Workspace): Promise<Floor> 
       legacy = await tx<LegacyRun[]>`select id::text, agent, status, started_at, finished_at, summary, stale
                                      from office.legacy_agent_runs(${ws.id}, 8)`;
     }
-    return { agents: state, legacy, spentToday: spent, awaitingAgent: awaiting.length };
+    return { agents: state, legacy, spentToday: spent, awaitingAgent: awaiting.length,
+      waitingByExecutor: awaiting.filter((w) => !w.claimed_by).reduce<Record<string, number>>((m, w) => ({ ...m, [w.executor]: (m[w.executor] ?? 0) + 1 }), {}) };
   });
 }
 
@@ -189,7 +211,7 @@ export interface RunDetail {
   steps: Array<{
     id: string; step_key: string; agent_role: string; cycle: number; status: string; attempt: number; max_attempts: number;
     provider: string | null; model: string | null; cost_usd: string; tokens_in: string; tokens_out: string;
-    error: string | null; started_at: string | null; finished_at: string | null;
+    error: string | null; started_at: string | null; finished_at: string | null; executor: string | null;
   }>;
   events: Array<{ id: string; kind: string; agent_role: string | null; activity: string | null; actor_type: string; payload: Record<string, unknown>; created_at: string }>;
   artifacts: Array<{ id: string; kind: string; title: string; version: number; content: Record<string, unknown>; content_hash: string; provider: string; model: string | null; created_at: string }>;
@@ -209,7 +231,7 @@ export async function runDetail(userId: string, runId: string): Promise<RunDetai
     const [brief] = await tx`select title, objective, audience, channel, deliverable_count, acceptance_criteria, deadline::text as deadline, priority
                              from office.briefs where id = ${run.brief_id}`;
     const steps = await tx`select id, step_key, agent_role, cycle, status, attempt, max_attempts, provider, model,
-                                  cost_usd::text, tokens_in::text, tokens_out::text, error, started_at, finished_at
+                                  cost_usd::text, tokens_in::text, tokens_out::text, error, started_at, finished_at, executor
                            from office.steps where run_id = ${runId} order by created_at`;
     const events = await tx`select id::text, kind, agent_role, activity, actor_type, payload, created_at
                             from office.events where run_id = ${runId} order by id`;
@@ -231,4 +253,19 @@ export async function listKnowledge(userId: string, wsId: string): Promise<Knowl
   return asUser(db(), userId, (tx) => tx<KnowledgeDoc[]>`
     select id, kind, title, body, status, source_url, updated_at from office.knowledge_docs
     where workspace_id = ${wsId} and status <> 'archived' order by status, kind, title`);
+}
+
+export interface ExecutorRow {
+  id: string;
+  kind: string;
+  name: string;
+  last_seen_at: string | null;
+  created_at: string;
+}
+
+/** Connected executors (ChatGPT, Claude) of a workspace. Token hashes are never readable by users. */
+export async function executors(userId: string, wsId: string): Promise<ExecutorRow[]> {
+  return asUser(db(), userId, (tx) => tx<ExecutorRow[]>`
+    select id, kind, name, last_seen_at::text, created_at::text from office.executors
+    where workspace_id = ${wsId} and revoked_at is null order by created_at`);
 }

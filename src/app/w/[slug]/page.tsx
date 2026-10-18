@@ -1,7 +1,8 @@
 import { randomUUID } from "node:crypto";
 import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/supabase";
-import { floorState, listHandoffs, listRuns, workspaceBySlug } from "@/lib/queries";
+import { EXECUTOR_LABEL, executors, floorState, listHandoffs, listRuns, workspaceBySlug } from "@/lib/queries";
+import { revokeExecutorAction } from "../../actions";
 import { PixelAvatar } from "../../components/PixelAvatar";
 import { LiveRefresh } from "../../components/LiveRefresh";
 import { ACTIVITY, HANDOFF_STATUS, ProviderBadge, StatusPill, StubBadge, usd, when } from "../../components/ui";
@@ -20,7 +21,7 @@ export default async function OfficePage({ params }: { params: Promise<{ slug: s
   const user = await requireUser();
   const ws = await workspaceBySlug(user.id, slug);
   if (!ws) notFound();
-  const [floor, runs, handoffs] = await Promise.all([floorState(user.id, ws), listRuns(user.id, ws.id), listHandoffs(user.id, ws.id)]);
+  const [floor, runs, handoffs, execs] = await Promise.all([floorState(user.id, ws), listRuns(user.id, ws.id), listHandoffs(user.id, ws.id), executors(user.id, ws.id)]);
 
   const active = runs.some((r) => r.status === "queued" || r.status === "running");
   const waiting = runs.filter((r) => r.status === "needs_approval");
@@ -30,12 +31,19 @@ export default async function OfficePage({ params }: { params: Promise<{ slug: s
   return (
     <>
       <LiveRefresh active={active} />
-      {floor.awaitingAgent > 0 && (
-        <p className="notice" style={{ marginBottom: 16 }} role="status">
-          {floor.awaitingAgent === 1 ? "1 крок чекає" : `${floor.awaitingAgent} кроки чекають`} на Claude. Запусти в Claude задачу
-          «AI Office: відпрацювати чергу» (Scheduled tasks → Run now) або напиши в чаті «запусти офіс».
+      {(floor.waitingByExecutor.claude_session ?? 0) > 0 && (
+        <p className="notice" style={{ marginBottom: 8 }} role="status">
+          {floor.waitingByExecutor.claude_session === 1 ? "1 крок чекає" : `${floor.waitingByExecutor.claude_session} кроки чекають`} на Claude.
+          Запусти в Claude задачу «AI Office: відпрацювати чергу» або напиши в чаті «запусти офіс».
         </p>
       )}
+      {(floor.waitingByExecutor.chatgpt ?? 0) > 0 && (
+        <p className="notice" style={{ marginBottom: 8 }} role="status">
+          {floor.waitingByExecutor.chatgpt === 1 ? "1 крок чекає" : `${floor.waitingByExecutor.chatgpt} кроки чекають`} на ChatGPT.
+          Відкрий ChatGPT з підключеним AI Office і напиши «візьми задачі AI Office».
+        </p>
+      )}
+      {floor.awaitingAgent > 0 && <div style={{ marginBottom: 8 }} />}
       <section className="floor" aria-labelledby="floor-title">
         <div className="floor-head">
           <h2 id="floor-title">Маркетинговий відділ {ws.name}</h2>
@@ -127,6 +135,33 @@ export default async function OfficePage({ params }: { params: Promise<{ slug: s
                       <div className="row-main"><div className="row-title">{r.title}</div><div className="row-meta">{when(r.updated_at)}</div></div>
                       <span className="btn secondary">Переглянути</span>
                     </a>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+
+          <section className="panel" aria-labelledby="exec-title">
+            <div className="panel-head">
+              <h2 id="exec-title">Виконавці</h2>
+              <span className="muted small">Підключення через MCP</span>
+            </div>
+            {execs.length === 0 ? (
+              <p className="empty">Ще нікого не підключено. Адреса для ChatGPT і Claude: <code>/api/mcp</code> цього сайту.</p>
+            ) : (
+              <ul className="list">
+                {execs.map((e) => (
+                  <li key={e.id} className="row">
+                    <div className="row-main">
+                      <div className="row-title">{e.name} <span className="pill">{EXECUTOR_LABEL[e.kind] ?? e.kind}</span></div>
+                      <div className="row-meta">{e.last_seen_at ? `Останнє звернення ${when(e.last_seen_at)}` : "Ще не звертався"}</div>
+                    </div>
+                    {ws.role === "owner" && (
+                      <form action={revokeExecutorAction}>
+                        <input type="hidden" name="executor_id" value={e.id} />
+                        <button className="btn link">Відключити</button>
+                      </form>
+                    )}
                   </li>
                 ))}
               </ul>

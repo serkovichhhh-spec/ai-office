@@ -2,7 +2,8 @@ import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/supabase";
 import { runDetail, stepLabel, workspaceBySlug, type RunDetail } from "@/lib/queries";
 import { LiveRefresh } from "../../../../components/LiveRefresh";
-import { HANDOFF_STATUS, ROLE_LABEL, STEP_STATUS, ProviderBadge, StatusPill, StubBadge, clock, usd, when } from "../../../../components/ui";
+import { HANDOFF_STATUS, ROLE_LABEL, STEP_STATUS, ProviderBadge, StatusPill, StubBadge, clock, modelLabel, usd, when } from "../../../../components/ui";
+import { EXECUTOR_LABEL } from "@/lib/queries";
 import { cancelRunAction } from "../../../../actions";
 import { DecisionPanel } from "./DecisionPanel";
 
@@ -28,9 +29,13 @@ const EVENT_TEXT: Record<string, (e: RunDetail["events"][number]) => string> = {
   "run.cancelled": () => "Запуск скасовано",
   "run.budget_exceeded": () => "Зупинено: вичерпано бюджет",
   "run.max_steps": () => "Зупинено: забагато кроків",
-  "step.awaiting_agent": (e) => `${role(e.agent_role)}: ${stepLabel(String(e.payload.step))} чекає на Claude-сесію${e.payload.note ? " (повтор: відповідь не пройшла перевірку)" : ""}`,
-  "step.agent_submitted": (e) => `${role(e.agent_role)}: Claude передав результат — ${stepLabel(String(e.payload.step))}`,
+  "step.awaiting_agent": (e) => `${role(e.agent_role)}: ${stepLabel(String(e.payload.step))} чекає на ${who(e.payload.executor)}${e.payload.note ? " (повтор: відповідь не пройшла перевірку)" : ""}`,
+  "attempt.claimed": (e) => `${role(e.agent_role)}: ${String(e.payload.executor_name ?? who(e.payload.executor))} взяв у роботу — ${stepLabel(String(e.payload.step))}, оренда до ${clock(String(e.payload.lease_expires_at))}`,
+  "attempt.saved_as_proposal": (e) => `${role(e.agent_role)}: результат від ${who(e.payload.executor)} збережено як пропозицію, не застосовано (${PROPOSAL[String(e.payload.reason)] ?? e.payload.reason})`,
+  "step.agent_submitted": (e) => `${role(e.agent_role)}: ${String(e.payload.executor_name ?? who(e.payload.executor))} передав результат — ${stepLabel(String(e.payload.step))}`,
 };
+const PROPOSAL: Record<string, string> = { lease_expired: "оренда минула", task_no_longer_waiting: "задача вже неактуальна", inputs_changed: "вхідні дані змінилися" };
+const who = (k: unknown) => EXECUTOR_LABEL[String(k ?? "claude_session")] ?? String(k);
 const DECISION: Record<string, string> = { approved: "затверджено", rejected: "відхилено", revision_requested: "на доопрацювання" };
 const KIND: Record<string, string> = { strategy: "стратегія", scripts: "сценарії", review: "рев'ю", deliverable: "пакет" };
 const role = (r: string | null) => (r ? ROLE_LABEL[r] ?? r : "Система");
@@ -51,6 +56,7 @@ export default async function RunPage({ params }: { params: Promise<{ slug: stri
 
   const active = ["queued", "running"].includes(d.run.status);
   const awaitingAgent = d.steps.some((s) => s.status === "awaiting_agent");
+  const awaitingExecutor = d.steps.find((s) => s.status === "awaiting_agent")?.executor ?? "claude_session";
   const deliverables = d.artifacts.filter((a) => a.kind === "deliverable");
   const latest = deliverables.at(-1) ?? null;
   const isStub = d.artifacts.some((a) => a.provider === "stub") || d.run.provider === "stub";
@@ -95,7 +101,9 @@ export default async function RunPage({ params }: { params: Promise<{ slug: stri
       )}
       {awaitingAgent && (
         <p className="notice" style={{ marginTop: 16 }} role="status">
-          Наступний крок чекає на Claude. Запусти задачу «AI Office: відпрацювати чергу» в Claude або напиши в чаті «запусти офіс» — сторінка оновиться сама.
+          {awaitingExecutor === "chatgpt"
+            ? "Наступний крок чекає на ChatGPT. Відкрий ChatGPT з підключеним AI Office і напиши «візьми задачі AI Office» — сторінка оновиться сама."
+            : "Наступний крок чекає на Claude. Запусти задачу «AI Office: відпрацювати чергу» в Claude або напиши в чаті «запусти офіс» — сторінка оновиться сама."}
         </p>
       )}
       {d.run.status === "failed" && (
@@ -173,7 +181,7 @@ export default async function RunPage({ params }: { params: Promise<{ slug: stri
                         {s.error && <div className="error small">{s.error}</div>}</td>
                       <td>{role(s.agent_role)}</td>
                       <td><StatusPill status={s.status} map={STEP_STATUS} /></td>
-                      <td>{s.provider === "code" ? "код" : s.model === "claude-session" ? "Claude-сесія" : s.model ?? "—"}</td>
+                      <td>{modelLabel(s.provider, s.model)}</td>
                       <td>{s.provider === "code" ? "—" : usd(s.cost_usd)}</td>
                       <td className="muted">{s.started_at ? clock(s.started_at) : "—"}</td>
                     </tr>

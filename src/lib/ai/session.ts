@@ -15,6 +15,8 @@ export interface AgentResponse {
   schemaName: string;
   output: unknown;
   submitted_at?: string;
+  /** Who answered through the Execution Gateway ("chatgpt" | "claude_session"); absent for legacy submits. */
+  executor?: string;
 }
 
 /** Thrown when the step must be handed to a Claude session; the worker parks the step. */
@@ -47,6 +49,6 @@ export class SessionProvider implements AiProvider {
       // Ask again, telling the session exactly what was wrong.
       throw new AgentNeededError({ ...base, note: `Попередня відповідь не пройшла перевірку схеми: ${parsed.error.message.slice(0, 600)}` });
     }
-    return { output: parsed.data, usage: { tokens_in: 0, tokens_out: 0, cost_usd: 0 }, model: "claude-session", provider: "session" };
+    return { output: parsed.data, usage: { tokens_in: 0, tokens_out: 0, cost_usd: 0 }, model: this.response.executor === "chatgpt" ? "chatgpt" : "claude-session", provider: "session" };
   }
 }

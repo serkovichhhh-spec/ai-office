@@ -12,7 +12,7 @@ export const RUN_STATUS: Record<string, { label: string; tone: string }> = {
 export const STEP_STATUS: Record<string, { label: string; tone: string }> = {
   ready: { label: "в черзі", tone: "" },
   running: { label: "виконується", tone: "active" },
-  awaiting_agent: { label: "чекає на Claude", tone: "wait" },
+  awaiting_agent: { label: "чекає на виконавця", tone: "wait" },
   succeeded: { label: "готово", tone: "ok" },
   failed: { label: "помилка", tone: "bad" },
   cancelled: { label: "скасовано", tone: "" },
@@ -38,7 +38,7 @@ export const ACTIVITY: Record<string, string> = {
   reviewing: "Перевіряє",
   waiting_approval: "Чекає на ваше рішення",
   unassigned: "Ще без задач",
-  awaiting_agent: "Чекає на запуск Claude",
+  awaiting_agent: "Чекає на виконавця",
   awaiting_bridge: "Чекає на міст",
   blocked: "Заблокований",
 };
@@ -67,10 +67,18 @@ export function StatusPill({ status, map = RUN_STATUS }: { status: string; map?:
 
 export function ProviderBadge({ provider }: { provider: string | null | undefined }) {
   if (provider === "session") {
-    return <span className="pill" title="Тексти пише Claude у сесії, яку запускає власник">Claude-сесія</span>;
+    return <span className="pill" title="Тексти пишуть Claude і ChatGPT у сесіях, які запускає власник">Claude / ChatGPT</span>;
   }
   if (provider === "stub") return <StubBadge />;
   return null;
+}
+
+/** Who produced a step: code, a model API, or an external executor through the gateway. */
+export function modelLabel(provider: string | null, model: string | null): string {
+  if (provider === "code") return "код";
+  if (model === "claude-session") return "Claude";
+  if (model === "chatgpt") return "ChatGPT";
+  return model ?? "—";
 }
 
 export function StubBadge() {

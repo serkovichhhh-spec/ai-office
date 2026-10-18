@@ -2,10 +2,11 @@
 import { useActionState } from "react";
 import { signInAction, type ActionState } from "../actions";
 
-export function LoginForm() {
+export function LoginForm({ next = "/" }: { next?: string }) {
   const [state, action, pending] = useActionState<ActionState, FormData>(signInAction, {});
   return (
     <form action={action} className="form-grid">
+      <input type="hidden" name="next" value={next} />
       <label>Email<input name="email" type="email" autoComplete="email" required /></label>
       <label>Пароль<input name="password" type="password" autoComplete="current-password" required /></label>
       {state.error && <p className="error" role="alert">{state.error}</p>}

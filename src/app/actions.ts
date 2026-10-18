@@ -1,4 +1,5 @@
 "use server";
+import { safeNext } from "@/lib/mcp/oauth";
 
 import { after } from "next/server";
 import { redirect } from "next/navigation";
@@ -131,7 +132,7 @@ export async function signInAction(_prev: ActionState, form: FormData): Promise<
   const supabase = await supabaseServer();
   const { error } = await supabase.auth.signInWithPassword({ email, password });
   if (error) return { error: "Невірний email або пароль" };
-  redirect("/");
+  redirect(safeNext(form.get("next")));
 }
 
 export async function signOutAction(): Promise<void> {
@@ -163,3 +164,11 @@ function friendly(e: unknown): string {
   return "Не вдалося виконати дію. Спробуйте ще раз.";
 }
 
+
+/** Owner disconnects ChatGPT / Claude: all its tokens stop working immediately. */
+export async function revokeExecutorAction(form: FormData): Promise<void> {
+  const user = await requireUser();
+  const id = String(form.get("executor_id") ?? "");
+  await asUser(db(), user.id, (tx) => tx`select office.revoke_executor(${id}::uuid)`);
+  revalidatePath("/w", "layout");
+}
