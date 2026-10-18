@@ -310,10 +310,12 @@ create policy artifacts_read on office.artifacts for select to authenticated usi
 create policy approvals_read on office.approvals for select to authenticated using (office.is_member(workspace_id));
 create policy handoffs_read on office.handoffs for select to authenticated using (office.is_member(workspace_id));
 
+-- Start from zero (defensive against any platform default privileges), then grant the minimum.
+revoke all on all tables in schema office from public, anon, authenticated, service_role, office_app;
+revoke all on all sequences in schema office from public, anon, authenticated, service_role, office_app;
 grant select on all tables in schema office to authenticated;
 grant insert, update (kind, title, body, status, source_url, freshness_date, updated_at) on office.knowledge_docs to authenticated;
 grant update (display_name, model_tier, system_prompt, allowed_tools, enabled, updated_at) on office.agents to authenticated;
-revoke all on all tables in schema office from anon;
 
 -- ---------------------------------------------------------------------------
 -- Internal helpers
@@ -615,7 +617,7 @@ begin
     locked_by = null, locked_until = null, finished_at = now(), error = null
   where id = s.id;
   update office.runs set cost_usd = cost_usd + v_cost, tokens_in = tokens_in + v_tin, tokens_out = tokens_out + v_tout,
-    provider = coalesce(provider, p_result->>'provider')
+    provider = coalesce(provider, nullif(p_result->>'provider', 'code'))
   where id = r.id;
 
   for art in select value from jsonb_array_elements(coalesce(p_result->'artifacts', '[]'::jsonb)) loop
@@ -704,7 +706,7 @@ $$;
 -- ---------------------------------------------------------------------------
 -- Function privileges
 -- ---------------------------------------------------------------------------
-revoke all on all functions in schema office from public;
+revoke all on all functions in schema office from public, anon, authenticated, service_role, office_app;
 grant execute on function office.member_role(uuid), office.is_member(uuid), office.has_role(uuid, text[]),
   office.create_brief(uuid, jsonb), office.submit_brief(uuid, text), office.cancel_run(uuid),
   office.decide(uuid, text, text), office.legacy_agent_runs(uuid, int)

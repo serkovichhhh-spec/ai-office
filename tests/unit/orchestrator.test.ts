@@ -93,8 +93,8 @@ describe("prompt safety", () => {
 
 describe("providers", () => {
   it("defaults to the stub when no key is configured", () => {
-    expect(providerFromEnv({} as NodeJS.ProcessEnv).name).toBe("stub");
-    expect(() => providerFromEnv({ AI_PROVIDER: "anthropic" } as NodeJS.ProcessEnv)).toThrow(/ANTHROPIC_API_KEY/);
+    expect(providerFromEnv({} as unknown as NodeJS.ProcessEnv).name).toBe("stub");
+    expect(() => providerFromEnv({ AI_PROVIDER: "anthropic" } as unknown as NodeJS.ProcessEnv)).toThrow(/ANTHROPIC_API_KEY/);
   });
 
   const scriptsOut = { scripts: [{ title: "a", angle: "b", duration_sec: 15, hook: "h", scenes: [{ shot: "s", on_screen_text: "", voiceover: "" }], cta: "c", claims_needing_source: [] }] };
