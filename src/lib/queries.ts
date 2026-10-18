@@ -1,5 +1,6 @@
 import "server-only";
 import { asUser, db } from "./db";
+import { PLAYBOOKS } from "./orchestrator/registry";
 
 export type Role = "owner" | "approver" | "editor" | "viewer";
 
@@ -32,6 +33,7 @@ export interface AgentState {
   model_tier: string;
   enabled: boolean;
   provenance: string;
+  department: "marketing" | "production";
   activity: string; // derived from persisted steps/runs only
   detail: string | null;
   run_id: string | null;
@@ -56,10 +58,10 @@ export interface Floor {
 /** Team state is computed from steps/runs in the database; nothing here is simulated. */
 export async function floorState(userId: string, ws: Workspace): Promise<Floor> {
   return asUser(db(), userId, async (tx) => {
-    const agents = await tx<{ role_key: string; display_name: string; model_tier: string; enabled: boolean; provenance: string }[]>`
-      select role_key, display_name, model_tier, enabled, provenance from office.agents
+    const agents = await tx<{ role_key: string; display_name: string; model_tier: string; enabled: boolean; provenance: string; department: "marketing" | "production" }[]>`
+      select role_key, display_name, model_tier, enabled, provenance, department from office.agents
       where workspace_id = ${ws.id}
-      order by array_position(array['orchestrator','strategist','research_analyst','performance_analyst','creative_director','copywriter','reviewer'], role_key)`;
+      order by sort_order, display_name`;
     const running = await tx<{ agent_role: string; step_key: string; run_id: string; title: string }[]>`
       select s.agent_role, s.step_key, s.run_id, b.title from office.steps s
       join office.runs r on r.id = s.run_id join office.briefs b on b.id = r.brief_id
@@ -93,7 +95,11 @@ export async function floorState(userId: string, ws: Workspace): Promise<Floor> 
       if (f) return { ...a, activity: "blocked", detail: f.error?.slice(0, 140) ?? "Крок завершився помилкою", run_id: f.run_id };
       const q = queued.find((x) => x.agent_role === a.role_key);
       if (q) return { ...a, activity: "queued", detail: `У черзі · ${q.title}`, run_id: q.run_id };
-      return { ...a, activity: a.enabled ? "idle" : "off", detail: null, run_id: null };
+      if (!a.enabled) return { ...a, activity: "off", detail: null, run_id: null };
+      // Honest roster: roles that no playbook uses yet are shown as such, never as busy.
+      if (a.department === "production") return { ...a, activity: "awaiting_bridge", detail: "Працює через локальний /produce — міст ще не підключено", run_id: null };
+      if (!USED_ROLES.has(a.role_key)) return { ...a, activity: "unassigned", detail: "Ще не задіяний у жодному сценарії", run_id: null };
+      return { ...a, activity: "idle", detail: null, run_id: null };
     });
 
     let legacy: LegacyRun[] | null = null;
@@ -105,8 +111,10 @@ export async function floorState(userId: string, ws: Workspace): Promise<Floor> 
   });
 }
 
+const USED_ROLES = new Set(Object.values(PLAYBOOKS).flatMap((p) => [...p.roles]));
+
 export function activityFor(role: string): string {
-  if (role === "copywriter" || role === "creative_director") return "drafting";
+  if (["copywriter", "creative_director", "creative", "smm", "content_maker"].includes(role)) return "drafting";
   if (role === "reviewer") return "reviewing";
   if (role === "orchestrator") return "planning";
   return "researching";
@@ -189,7 +197,7 @@ export async function runDetail(userId: string, runId: string): Promise<RunDetai
              r.started_at, r.finished_at, b.title, b.channel
       from office.runs r join office.briefs b on b.id = r.brief_id where r.id = ${runId}`;
     if (!run) return null;
-    const [brief] = await tx`select title, objective, audience, channel, deliverable_count, acceptance_criteria, deadline, priority
+    const [brief] = await tx`select title, objective, audience, channel, deliverable_count, acceptance_criteria, deadline::text as deadline, priority
                              from office.briefs where id = ${run.brief_id}`;
     const steps = await tx`select id, step_key, agent_role, cycle, status, attempt, max_attempts, provider, model,
                                   cost_usd::text, tokens_in::text, tokens_out::text, error, started_at, finished_at

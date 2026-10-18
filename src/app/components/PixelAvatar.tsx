@@ -18,6 +18,13 @@ const PALETTES: Record<string, { H: string; C: string; P: string; glasses?: bool
   creative_director: { H: "#b4442f", C: "#22252b", P: "#e8a92b" },
   copywriter: { H: "#1d1d1d", C: "#a8432d", P: "#f2f2f2" },
   reviewer: { H: "#6b6b6b", C: "#6b4fa0", P: "#c8402f", glasses: true },
+  creative: { H: "#d9822b", C: "#e0b33a", P: "#3e5c80" },
+  smm: { H: "#5a3a7a", C: "#d1557a", P: "#f2f2f2" },
+  content_maker: { H: "#2a2a2a", C: "#3b8c8c", P: "#e8a92b" },
+  designer: { H: "#8a5a3a", C: "#4a7fc1", P: "#f2c14e" },
+  graphic_designer: { H: "#c0392b", C: "#2c3e50", P: "#1abc9c" },
+  print_designer: { H: "#5d4037", C: "#7f8c8d", P: "#e74c3c" },
+  video_editor: { H: "#111111", C: "#34495e", P: "#9b59b6", glasses: true },
 };
 
 export function PixelAvatar({ role, size = 48 }: { role: string; size?: number }) {

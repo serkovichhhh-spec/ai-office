@@ -36,15 +36,24 @@ export const ACTIVITY: Record<string, string> = {
   drafting: "Пише",
   reviewing: "Перевіряє",
   waiting_approval: "Чекає на ваше рішення",
+  unassigned: "Ще без задач",
+  awaiting_bridge: "Чекає на міст",
   blocked: "Заблокований",
 };
 
 export const ROLE_LABEL: Record<string, string> = {
-  orchestrator: "Chief of Staff",
+  orchestrator: "Шеф-маркетолог",
+  creative: "Креативник",
+  smm: "SMM-менеджер",
+  content_maker: "Контент-мейкер",
+  designer: "Дизайнер",
+  graphic_designer: "Графічний дизайнер",
+  print_designer: "Дизайнер поліграфії",
+  video_editor: "Монтажер",
   strategist: "Стратег",
   research_analyst: "Аналітик",
   performance_analyst: "Перформанс-аналітик",
-  creative_director: "Креативний директор",
+  creative_director: "Арт-директор",
   copywriter: "Копірайтер",
   reviewer: "QA-рев'юер",
 };

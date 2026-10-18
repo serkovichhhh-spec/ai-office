@@ -37,26 +37,38 @@ export default async function OfficePage({ params }: { params: Promise<{ slug: s
             Витрачено сьогодні {usd(floor.spentToday)} з {usd(ws.daily_budget_usd)} {stubMode && <StubBadge />}
           </span>
         </div>
-        <div className="desks">
-          {floor.agents.map((a) => {
-            const body = (
-              <>
-                <PixelAvatar role={a.role_key} />
-                <div>
-                  <div className="tag">{a.display_name}</div>
-                  <div className="doing"><span className="lamp" aria-hidden="true" />{ACTIVITY[a.activity] ?? a.activity}</div>
-                  {a.detail && <div className="detail">{a.detail}</div>}
-                </div>
-              </>
-            );
-            const cls = `desk${WORKING.has(a.activity) ? " working" : ""}`;
-            return a.run_id ? (
-              <a key={a.role_key} className={cls} data-activity={a.activity} href={`/w/${ws.slug}/runs/${a.run_id}`}>{body}</a>
-            ) : (
-              <div key={a.role_key} className={cls} data-activity={a.activity}>{body}</div>
-            );
-          })}
-        </div>
+        {(["marketing", "production"] as const).map((dept) => {
+          const team = floor.agents.filter((a) => a.department === dept);
+          if (team.length === 0) return null;
+          return (
+            <div key={dept} className={`room room-${dept}`}>
+              <h3 className="room-title">
+                {dept === "marketing" ? "Marketing HQ" : "Production Studio"}
+                <span className="muted small"> · {dept === "marketing" ? "працюють онлайн" : "локальний /produce, підключиться через міст"}</span>
+              </h3>
+              <div className="desks">
+                {team.map((a) => {
+                  const body = (
+                    <>
+                      <PixelAvatar role={a.role_key} />
+                      <div>
+                        <div className="tag">{a.display_name}</div>
+                        <div className="doing"><span className="lamp" aria-hidden="true" />{ACTIVITY[a.activity] ?? a.activity}</div>
+                        {a.detail && <div className="detail">{a.detail}</div>}
+                      </div>
+                    </>
+                  );
+                  const cls = `desk${WORKING.has(a.activity) ? " working" : ""}`;
+                  return a.run_id ? (
+                    <a key={a.role_key} className={cls} data-activity={a.activity} href={`/w/${ws.slug}/runs/${a.run_id}`}>{body}</a>
+                  ) : (
+                    <div key={a.role_key} className={cls} data-activity={a.activity}>{body}</div>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
       </section>
 
       <div className="cols">
