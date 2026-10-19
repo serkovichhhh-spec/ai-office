@@ -1,7 +1,7 @@
 import type { z } from "zod";
 import type { AiProvider } from "@/lib/ai/types";
 import type { CatalogEntry } from "./catalog";
-import { LIBRARY_PLAYBOOKS } from "./library";
+import { LIBRARY_PLAYBOOKS, PROFESSIONAL_PLAYBOOKS } from "./library";
 import { oohConcepts } from "./playbooks/ooh-concepts";
 import { reelsConcepts } from "./playbooks/reels-concepts";
 import { ReviewSchema, ScriptsSchema, StrategySchema } from "./schemas";
@@ -27,6 +27,7 @@ const ALL: Playbook[] = [
   { ...reelsConcepts, version: 1, stepTitles: { strategy: "Стратегія", scripts: "Сценарії" } },
   { ...oohConcepts, version: 1 },
   ...LIBRARY_PLAYBOOKS,
+  ...PROFESSIONAL_PLAYBOOKS,
 ];
 
 export const PLAYBOOKS: Record<string, Playbook> = Object.fromEntries(ALL.map((p) => [`${p.key}@${p.version}`, p]));
@@ -58,7 +59,9 @@ export function stepTitle(key: string): string | undefined {
 
 /** Runs one step. Disabled agents are a configuration error, not a retryable one. */
 export async function executeStep(ctx: StepContext, ai: AiProvider): Promise<StepResult> {
-  if (ctx.agent && !ctx.agent.enabled && ctx.step.agent_role !== "orchestrator") {
+  const deterministic = ["intake", "revision_intake", "package"].includes(ctx.step.step_key);
+  if (!deterministic && !ctx.agent) throw new Error(`seat ${ctx.step.agent_role} is not configured in workspace ${ctx.workspace.slug}`);
+  if (ctx.agent && !ctx.agent.enabled && !deterministic) {
     throw new Error(`agent ${ctx.step.agent_role} is disabled in workspace ${ctx.workspace.slug}`);
   }
   return playbookFor(ctx.run.playbook_key, Number(ctx.run.playbook_version ?? 1)).execute(ctx, ai);

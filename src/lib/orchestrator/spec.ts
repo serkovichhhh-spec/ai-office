@@ -171,7 +171,7 @@ export function playbookFromSpec(spec: PlaybookSpec, opts: { version?: number; h
       schema: s.schema,
       tier: s.tier ?? ctx.agent?.model_tier ?? "balanced",
       maxOutputTokens: s.maxOutputTokens,
-      system: composeSystem(ctx.agent?.system_prompt, s.role),
+      system: composeSystem(ctx.agent?.system_prompt, s.role, s.seat),
       user: [
         s.task(ctx),
         dataBlock("brief", briefText(ctx.brief)),
@@ -202,7 +202,7 @@ export function playbookFromSpec(spec: PlaybookSpec, opts: { version?: number; h
       schemaName: "review_decision",
       schema: ReviewDecisionSchema,
       tier: ctx.agent?.model_tier ?? "balanced",
-      system: composeSystem(ctx.agent?.system_prompt, "Ти — незалежний QA-рев'юер маркетингових матеріалів."),
+      system: composeSystem(ctx.agent?.system_prompt, "Ти — незалежний QA-рев'юер маркетингових матеріалів.", "reviewer"),
       user: [
         "Перевір результат за критеріями. Сформуй оцінку незалежно, не спираючись на самооцінку автора.",
         `Критерії (оцінка 1–5 кожен, у scores.criterion — ключ критерію):\n${criteria}`,
@@ -284,6 +284,7 @@ export function playbookFromSpec(spec: PlaybookSpec, opts: { version?: number; h
     const providers = new Set(ctx.artifacts.map((a) => (a.content as { _provider?: string })?._provider).filter(Boolean));
     const content = {
       schema_version: "Package.v1",
+      outcome: rev?.content.verdict === "pass" && !providers.has("stub") ? "ready_for_approval" : "escalated",
       playbook: spec.key,
       brief: { id: ctx.brief.id, title: ctx.brief.title, objective: ctx.brief.objective, channel: ctx.brief.channel, fields: ctx.brief.fields ?? {} },
       revision: ctx.run.revision,

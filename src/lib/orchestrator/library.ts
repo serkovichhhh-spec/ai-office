@@ -11,6 +11,8 @@
  * approved (DB trigger approvals_outcome_gate).
  */
 import type { AiProvider, ModelTier } from "@/lib/ai/types";
+import { z } from "zod";
+import { blockedBriefStub, evidenceErrors, MarketingBriefSchema, marketingBriefContract, marketingBriefTask, type MarketingBrief } from "./marketing-brief";
 import type { BriefFieldSpec, CatalogEntry } from "./catalog";
 import { ENUM_LABEL, FIELD_LABEL, PLAYBOOK_GROUP } from "./catalog";
 import { bundle, contract, type SemanticCheck } from "./contracts";
@@ -160,13 +162,49 @@ function gatesPass(v: Obj): boolean {
 // ---------------------------------------------------------------------------
 // Engine
 // ---------------------------------------------------------------------------
-function libraryPlaybook(def: LibDef): Playbook {
-  const reg = regByKey.get(def.playbook_key) as RegEntry;
-  if (!reg) throw new Error(`registry entry missing for ${def.playbook_key}`);
+function libraryPlaybook(def: LibDef, professional = false): Playbook {
+  const base = regByKey.get(def.playbook_key) as RegEntry;
+  if (!base) throw new Error(`registry entry missing for ${def.playbook_key}`);
+  const reg = { ...base, version: base.version + (professional ? 1 : 0) };
   const steps = def.steps;
   const byKey = new Map(steps.map((s) => [s.key, s]));
   const order = steps.map((s) => s.key);
   const reviewTarget = def.review.send_back_to;
+  const seats = { prepare: byKey.get("prepare")!.seat, build: byKey.get("build")!.seat, review: def.review.seat };
+  const executor = (original: string) => professional ? "chatgpt" : original;
+  const reviewExecutor = professional ? "claude_session" : def.review.executor;
+
+  async function cmoBrief(ctx: StepContext, ai: AiProvider): Promise<StepResult> {
+    const schema = marketingBriefContract(ctx, seats);
+    const feedback = feedbackParts(ctx.step.input);
+    const res = await ai.generate({
+      schemaName: "MarketingBrief", schema,
+      jsonSchema: z.toJSONSchema(MarketingBriefSchema, { target: "draft-7" }) as Record<string, unknown>,
+      tier: "strong", maxOutputTokens: 14000,
+      system: composeSystem(ctx.agent?.system_prompt, "Ти - CMO, відповідальний за достатність брифу всього відділу.", "orchestrator"),
+      user: [marketingBriefTask(ctx, seats), dataBlock("brief", briefText(ctx.brief)),
+        dataBlock("knowledge", knowledgeText(ctx.knowledge)),
+        ...["marketing_brief", "prepare", "build", "review", "owner_revision"].flatMap((k) => {
+          const a = latestArtifact<unknown>(ctx, k);
+          return a ? [dataBlock("artifact", `${k} v${a.version}:\n${JSON.stringify(a.content)}`)] : [];
+        }),
+        feedback.length ? dataBlock("feedback", feedback.join("\n")) : "",
+      ].filter(Boolean).join("\n\n"),
+      stub: () => blockedBriefStub(seats),
+    });
+    // Recheck at the engine boundary as well as in the provider.
+    const out = schema.parse(res.output);
+    return {
+      output: { status: out.status }, provider: res.provider, model: res.model, usage: res.usage,
+      artifacts: [{ kind: "marketing_brief", title: "Бриф CMO: продукт, стратегія та завдання команді", content: { ...out, _provider: res.provider } }],
+      next_steps: out.status === "blocked" ? toPackage("blocked", "marketing_brief") : [{
+        step_key: steps[0].key, agent_role: steps[0].seat, executor: executor(steps[0].executor),
+        input: { ...ctx.step.input }, depends_on: ["marketing_brief"],
+      }],
+      run_status: null, activity: "planning",
+      message: out.status === "ready" ? "CMO підготував продуктовий бриф і завдання команді" : "CMO виявив блокуючі прогалини; виконавців не запущено",
+    };
+  }
 
   // Stub output (stub provider and tests only): minimal valid JSON, then made semantically consistent.
   const stubFor = (name: string, ctx: StepContext) => () => fixStub(def.playbook_key, stubFromJsonSchema(bundle(name) as never, name) as Obj, ctx);
@@ -181,18 +219,31 @@ function libraryPlaybook(def: LibDef): Playbook {
     const prev = feedback.length ? latestArtifact<unknown>(ctx, s.key) : null;
     const name = defName(s);
     const missing = (ctx.step.input.missing_inputs as string[] | undefined) ?? [];
+    const marketing = latestArtifact<MarketingBrief>(ctx, "marketing_brief");
+    if (professional && (!marketing || marketing.content.status !== "ready" || !marketingBriefContract(ctx, seats).safeParse(withoutProvider(marketing.content)).success)) {
+      return codeStep({ output: { blocked: true, reason: "marketing_brief_missing_or_invalid" },
+        next: toPackage("blocked", s.key), activity: "planning", message: "Немає чинного достатнього брифу CMO; виконання зупинено" });
+    }
+    for (const i of s.inputs.filter((x) => x.startsWith("artifact:"))) {
+      if (professional && !latestArtifact(ctx, i.slice(9))) throw new Error(`${s.key}: missing required ${i}`);
+    }
+    const checks: SemanticCheck = (v) => [
+      ...(s.key === "build" ? buildChecks(def.playbook_key, ctx)(v) : genericChecks(v)),
+      ...(professional ? evidenceErrors(v, ctx) : []),
+    ];
     const res = await ai.generate({
       schemaName: name,
-      schema: contract<Obj>(name, s.key === "build" ? buildChecks(def.playbook_key, ctx) : genericChecks),
+      schema: contract<Obj>(name, checks),
       jsonSchema: bundle(name),
       tier: (ctx.agent?.model_tier ?? "balanced") as ModelTier,
       maxOutputTokens: 12000,
-      system: composeSystem(ctx.agent?.system_prompt, `Ти — ${s.seat} у маркетинговому відділі.`),
+      system: composeSystem(ctx.agent?.system_prompt, `Ти — ${s.seat} у маркетинговому відділі. Виконуй саме завдання поточного каналу.`, s.seat),
       user: [
         `Плейбук «${def.title}» (${def.playbook_key} v${reg.version}), крок ${s.key}.`,
         s.task.replaceAll("deliverable_count", `deliverable_count (= ${ctx.brief.deliverable_count})`),
         `Перевірки якості цього кроку: ${s.quality_checks.join("; ")}.`,
         dataBlock("brief", briefText(ctx.brief)),
+        professional ? dataBlock("artifact", `marketing_brief v${marketing!.version}:\n${JSON.stringify(marketing!.content)}`) : "",
         ...s.inputs.filter((i) => i.startsWith("artifact:")).flatMap((i) => {
           const a = latestArtifact<unknown>(ctx, i.slice(9));
           return a ? [dataBlock("artifact", `${i.slice(9)} v${a.version}:\n${JSON.stringify(a.content)}`)] : [];
@@ -215,8 +266,8 @@ function libraryPlaybook(def: LibDef): Playbook {
       const i = order.indexOf(s.key);
       const nk = order[i + 1];
       next = nk
-        ? [{ step_key: nk, agent_role: byKey.get(nk)!.seat, executor: byKey.get(nk)!.executor, input: { review_loop: loop, ...carryOwner(ctx.step.input) }, depends_on: [s.key] }]
-        : [{ step_key: "review", agent_role: def.review.seat, executor: def.review.executor, input: { review_loop: loop, ...carryOwner(ctx.step.input) }, depends_on: [s.key] }];
+        ? [{ step_key: nk, agent_role: byKey.get(nk)!.seat, executor: executor(byKey.get(nk)!.executor), input: { ...(professional ? ctx.step.input : {}), ...carryOwner(ctx.step.input), review_loop: loop }, depends_on: [s.key] }]
+        : [{ step_key: "review", agent_role: def.review.seat, executor: reviewExecutor, input: { ...(professional ? ctx.step.input : {}), ...carryOwner(ctx.step.input), review_loop: loop }, depends_on: [s.key] }];
     }
     const count = Array.isArray(out[reg.main_output]) ? (out[reg.main_output] as unknown[]).length : null;
     return {
@@ -238,16 +289,20 @@ function libraryPlaybook(def: LibDef): Playbook {
   async function review(ctx: StepContext, ai: AiProvider): Promise<StepResult> {
     const loop = Number(ctx.step.input.review_loop ?? 0);
     const target = latestArtifact<Obj>(ctx, reviewTarget);
-    const targetMeta = ctx.artifacts.filter((a) => a.kind === reviewTarget).at(-1);
+    const targetMeta = ctx.artifacts.filter((a) => a.kind === reviewTarget).sort((a,b) => b.version - a.version)[0];
     const prevReview = loop > 0 ? latestArtifact<Obj>(ctx, "review") : null;
     const criteria = def.review.criteria.map((c) => `- ${c.key}: ${c.what} Пройдено, якщо ${c.pass_if}.`).join("\n");
     const res = await ai.generate({
       schemaName: "ReviewDecision",
-      schema: contract<Obj>("ReviewDecision", reviewChecks(def)),
+      schema: contract<Obj>("ReviewDecision", (v) => [
+        ...reviewChecks(def)(v),
+        ...(professional && (v.reviewed_artifact_id !== targetMeta?.id || String(v.reviewed_version) !== String(targetMeta?.version))
+          ? ["Рев'ю має посилатися на поточні id і version артефакту build"] : []),
+      ]),
       jsonSchema: bundle("ReviewDecision"),
       tier: (ctx.agent?.model_tier ?? "balanced") as ModelTier,
       maxOutputTokens: 6000,
-      system: composeSystem(ctx.agent?.system_prompt, "Ти — незалежний QA-рев'юер маркетингових матеріалів."),
+      system: composeSystem(ctx.agent?.system_prompt, "Ти — незалежний QA-рев'юер маркетингових матеріалів.", "reviewer"),
       user: [
         `Незалежне рев'ю плейбука «${def.title}» (${loop === 0 ? "перше" : "повторне"} рев'ю). Оціни кожен критерій окремо (1–5), без середнього.`,
         criteria,
@@ -260,6 +315,10 @@ function libraryPlaybook(def: LibDef): Playbook {
           ? `Попереднє рев'ю нижче. resolved_issue_ids — ID усунених зауважень; нерозв'язані повтори з тим самим ID. Нові зауваження — лише критичні пропущені раніше або внесені доопрацюванням.`
           : "Це перше рев'ю: resolved_issue_ids = [].",
         dataBlock("brief", briefText(ctx.brief)),
+        ...(professional ? ["marketing_brief", "owner_revision"].flatMap((k) => {
+          const a = latestArtifact<unknown>(ctx, k);
+          return a ? [dataBlock("artifact", `${k} v${a.version}:\n${JSON.stringify(a.content)}`)] : [];
+        }) : []),
         ...order.flatMap((k) => {
           const a = latestArtifact<unknown>(ctx, k);
           return a ? [dataBlock("artifact", `${k} v${a.version}:\n${JSON.stringify(a.content)}`)] : [];
@@ -267,6 +326,7 @@ function libraryPlaybook(def: LibDef): Playbook {
         prevReview ? dataBlock("artifact", `review v${prevReview.version}:\n${JSON.stringify(prevReview.content)}`) : "",
         dataBlock("knowledge", knowledgeText(ctx.knowledge)),
         ownerBlock(ctx.step.input),
+        professional ? "Перевір достатність брифу CMO, збереження правок власника та готовність реальних файлів. artifact_pointer для проблеми брифу починай /marketing_brief/, для підготовки /prepare/, для решти /build/. Коренева проблема повертається її відповідальному етапу. Відсутність даних у наданому контексті не доводить їх відсутність у компанії." : "",
       ].filter(Boolean).join("\n\n"),
       stub: () => ({
         decision: "pass",
@@ -279,6 +339,9 @@ function libraryPlaybook(def: LibDef): Playbook {
       }),
     });
     const r = res.output as Obj;
+    const upstream = professional && arr(r.issues).some((i) => i.resolution === "open" && ["critical", "major"].includes(String(i.severity)) && String(i.artifact_pointer).startsWith("/marketing_brief/"));
+    const prepareIssue = professional && arr(r.issues).some((i) => i.resolution === "open" && ["critical", "major"].includes(String(i.severity)) && String(i.artifact_pointer).startsWith("/prepare/"));
+    const repairTarget = upstream ? "marketing_brief" : prepareIssue ? "prepare" : reviewTarget;
     let next: StepResult["next_steps"];
     let message: string;
     if (r.decision === "pass" && gatesPass(r)) {
@@ -288,8 +351,8 @@ function libraryPlaybook(def: LibDef): Playbook {
       next = toPackage("escalated", "review");
       message = "Рев'юер ескалював власнику — без нових знань чи рішення не виправити";
     } else if (loop < MAX_REVISIONS) {
-      const s = byKey.get(reviewTarget)!;
-      next = [{ step_key: s.key, agent_role: s.seat, executor: s.executor, input: { reviewer_feedback: formatIssues(r), review_loop: loop + 1, ...carryOwner(ctx.step.input) }, depends_on: ["review"] }];
+      const s = byKey.get(repairTarget);
+      next = [{ step_key: repairTarget, agent_role: s?.seat ?? "orchestrator", executor: s ? executor(s.executor) : "chatgpt", input: { ...(professional ? ctx.step.input : {}), ...carryOwner(ctx.step.input), reviewer_feedback: formatIssues(r), review_loop: loop + 1 }, depends_on: ["review"] }];
       message = `Рев'юер повернув на доопрацювання (зауважень: ${arr(r.issues).filter((i) => i.resolution === "open").length})`;
     } else {
       next = toPackage("escalated", "review");
@@ -317,8 +380,8 @@ function libraryPlaybook(def: LibDef): Playbook {
     if (ctx.brief.deliverable_count > reg.deliverable_count_max) warnings.push(`deliverable_count більший за ліміт ${reg.deliverable_count_max}`);
     const first = steps[0];
     return codeStep({
-      output: { playbook: def.playbook_key, version: reg.version, library: LIBRARY_VERSION, plan: [...order, "review", "package"], missing_inputs: missing, warnings },
-      next: [{ step_key: first.key, agent_role: first.seat, executor: first.executor, input: { review_loop: 0, missing_inputs: missing }, depends_on: ["intake"] }],
+      output: { playbook: def.playbook_key, version: reg.version, library: LIBRARY_VERSION, plan: [...(professional ? ["marketing_brief"] : []), ...order, "review", "package"], missing_inputs: missing, warnings },
+      next: [{ step_key: professional ? "marketing_brief" : first.key, agent_role: professional ? "orchestrator" : first.seat, executor: professional ? "chatgpt" : first.executor, input: { review_loop: 0, missing_inputs: missing }, depends_on: ["intake"] }],
       activity: "planning",
       message: warnings.length ? `План готовий; зауважень: ${warnings.length}` : "План готовий",
     });
@@ -329,17 +392,23 @@ function libraryPlaybook(def: LibDef): Playbook {
     const s = byKey.get(reviewTarget)!;
     return codeStep({
       output: { owner_feedback: feedback, revision: ctx.step.input.revision ?? null },
-      next: [{ step_key: s.key, agent_role: s.seat, executor: s.executor, input: { owner_feedback: feedback, review_loop: 0 }, depends_on: ["revision_intake"] }],
+      artifacts: professional ? [{ kind: "owner_revision", title: "Правки власника", content: { feedback, revision: ctx.step.input.revision ?? null } }] : [],
+      next: [{ step_key: professional ? "marketing_brief" : s.key, agent_role: professional ? "orchestrator" : s.seat, executor: professional ? "chatgpt" : s.executor, input: { owner_feedback: feedback, review_loop: 0 }, depends_on: ["revision_intake"] }],
       activity: "planning",
       message: "Коментар власника — на доопрацювання",
     });
   }
 
   function pack(ctx: StepContext): StepResult {
-    const outcome = String(ctx.step.input.outcome ?? "ready_for_approval") as "ready_for_approval" | "blocked" | "escalated";
+    let outcome = String(ctx.step.input.outcome ?? "ready_for_approval") as "ready_for_approval" | "blocked" | "escalated";
     const build = latestArtifact<Obj>(ctx, reviewTarget);
     const prep = latestArtifact<Obj>(ctx, order[0]);
     const rev = latestArtifact<Obj>(ctx, "review");
+    const marketing = latestArtifact<MarketingBrief>(ctx, "marketing_brief");
+    if (professional && (!marketing || marketing.content.status !== "ready" || !marketingBriefContract(ctx, seats).safeParse(withoutProvider(marketing.content)).success)) outcome = "blocked";
+    if (professional && outcome === "ready_for_approval" && (!build || !rev || rev.content.decision !== "pass" || !gatesPass(rev.content))) outcome = "escalated";
+    const buildMeta = ctx.artifacts.filter((a) => a.kind === reviewTarget).sort((a,b) => b.version - a.version)[0];
+    if (professional && outcome === "ready_for_approval" && (rev?.content.reviewed_artifact_id !== buildMeta?.id || String(rev?.content.reviewed_version) !== String(buildMeta?.version))) outcome = "escalated";
     const source = build ?? prep;
     const sections = def.package.sections.flatMap((key) => {
       if (key === "review") return [];
@@ -353,12 +422,26 @@ function libraryPlaybook(def: LibDef): Playbook {
       ...(build ? [] : arr(prep?.content.claims_needing_source)),
     ].map((c) => `${String(c.text)}${c.disposition === "excluded" ? " (прибрано з матеріалу)" : ""}`);
     const blocking = arr((source?.content.blocking_questions as unknown) ?? []).map(String);
+    if (professional) blocking.push(...(marketing?.content.blocking_questions ?? []));
+    if (professional && outcome === "blocked" && !blocking.length) blocking.push("Бриф CMO відсутній, заблокований або його джерела змінилися. Відповідальний: orchestrator.");
+    if (professional && marketing) sections.unshift({ kind: "marketing_brief", label: "Бриф CMO", version: marketing.version, content: marketing.content });
     const providers = new Set(ctx.artifacts.map((a) => (a.content as { _provider?: string })?._provider).filter(Boolean));
+    if (professional && outcome === "ready_for_approval" && providers.has("stub")) outcome = "escalated";
+    const usedIds = new Set<string>();
+    const collectRefs = (v: unknown) => {
+      if (Array.isArray(v)) { v.forEach(collectRefs); return; }
+      if (!v || typeof v !== "object") return;
+      const o = v as Obj;
+      if (typeof o.record_id === "string") usedIds.add(o.record_id);
+      Object.values(o).forEach(collectRefs);
+    };
+    [marketing?.content, prep?.content, build?.content].forEach(collectRefs);
     const content = {
       schema_version: "Package.v1",
       playbook: def.playbook_key,
       playbook_version: reg.version,
       library_version: LIBRARY_VERSION,
+      ...(professional ? { professional_workflow: "v2", deliverable_stage: "structured_output", file_quality_verified: false } : {}),
       outcome,
       brief: { id: ctx.brief.id, title: ctx.brief.title, objective: ctx.brief.objective, channel: ctx.brief.channel, fields: ctx.brief.fields ?? {} },
       revision: ctx.run.revision,
@@ -375,7 +458,8 @@ function libraryPlaybook(def: LibDef): Playbook {
           }
         : null,
       unsupported_claims: claims.slice(0, 60),
-      sources_used: ctx.knowledge.map((k) => ({ title: k.title, url: k.source_url, id: k.id ?? null, version: k.version ?? null })),
+      sources_used: ctx.knowledge.filter((k) => !professional || (k.id && usedIds.has(k.id))).map((k) => ({ title: k.title, url: k.source_url, id: k.id ?? null, version: k.version ?? null })),
+      ...(professional ? { sources_available: ctx.knowledge.map((k) => ({ title: k.title, id: k.id ?? null, version: k.version ?? null })) } : {}),
       artifact_refs: ctx.artifacts.filter((a) => [...order, "review"].includes(a.kind)).map((a) => ({ kind: a.kind, version: a.version, id: a.id ?? null, hash: a.hash ?? null })),
       handoff: { to: def.handoff.to, note: `Передати: ${def.handoff.payload.filter((p) => p !== "approved_manifest").map((p) => SECTION_LABEL[p] ?? p).join(", ")}` },
       generated_by: [...providers],
@@ -401,6 +485,7 @@ function libraryPlaybook(def: LibDef): Playbook {
     group: PLAYBOOK_GROUP[def.playbook_key] ?? "Інше",
     maxCount: reg.deliverable_count_max,
     fields: briefFields(def),
+    hidden: !professional,
   };
   return {
     key: def.playbook_key,
@@ -408,14 +493,15 @@ function libraryPlaybook(def: LibDef): Playbook {
     title: def.title,
     roles,
     catalog,
-    stepTitles: STEP_TITLE,
-    schemas: Object.fromEntries([...steps.map((s) => defName(s)), "ReviewDecision"].map((n) => [n, contract(n)])),
+    stepTitles: { ...STEP_TITLE, ...(professional ? { marketing_brief: "Бриф CMO" } : {}) },
+    schemas: { ...Object.fromEntries([...steps.map((s) => defName(s)), "ReviewDecision"].map((n) => [n, contract(n)])), ...(professional ? { MarketingBrief: MarketingBriefSchema } : {}) },
     async execute(ctx, ai) {
       const k = ctx.step.step_key;
       if (k === "intake") return intake(ctx);
       if (k === "revision_intake") return revisionIntake(ctx);
       if (k === "review") return review(ctx, ai);
       if (k === "package") return pack(ctx);
+      if (professional && k === "marketing_brief") return cmoBrief(ctx, ai);
       const s = byKey.get(k);
       if (!s) throw new Error(`${def.playbook_key}: unknown step ${k}`);
       return authorStep(ctx, ai, s);
@@ -476,4 +562,12 @@ function briefFields(def: LibDef): BriefFieldSpec[] {
     });
 }
 
-export const LIBRARY_PLAYBOOKS: Playbook[] = defs.map(libraryPlaybook);
+function withoutProvider<T>(value: T): Omit<T, "_provider"> {
+  const { _provider, ...rest } = value as T & { _provider?: unknown };
+  void _provider;
+  return rest;
+}
+
+// Preserve persisted runs; offer only the new, explicitly versioned CMO-first graph.
+export const LIBRARY_PLAYBOOKS: Playbook[] = defs.map((d) => libraryPlaybook(d));
+export const PROFESSIONAL_PLAYBOOKS: Playbook[] = defs.map((d) => libraryPlaybook(d, true));

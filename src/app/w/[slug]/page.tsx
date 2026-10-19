@@ -8,6 +8,7 @@ import { LiveRefresh } from "../../components/LiveRefresh";
 import { ACTIVITY, HANDOFF_STATUS, ProviderBadge, StatusPill, StubBadge, usd, when } from "../../components/ui";
 import { BriefForm } from "./BriefForm";
 import { PLAYBOOK_CATALOG } from "@/lib/orchestrator/registry";
+import { ROLE_CONTRACTS, type RoleKey } from "@/lib/orchestrator/role-contracts";
 
 export const dynamic = "force-dynamic";
 
@@ -59,7 +60,7 @@ export default async function OfficePage({ params }: { params: Promise<{ slug: s
             <div key={dept} className={`room room-${dept}`}>
               <h3 className="room-title">
                 {dept === "marketing" ? "Marketing HQ" : "Production Studio"}
-                <span className="muted small"> · {dept === "marketing" ? "працюють онлайн" : "локальний /produce, підключиться через міст"}</span>
+                <span className="muted small"> · {dept === "marketing" ? "стратегія, дослідження й комунікації" : "дизайн і підготовка матеріалів"}</span>
               </h3>
               <div className="desks">
                 {team.map((a) => {
@@ -86,13 +87,29 @@ export default async function OfficePage({ params }: { params: Promise<{ slug: s
         })}
       </section>
 
+      <section className="panel" aria-labelledby="responsibilities-title">
+        <h2 id="responsibilities-title">Обов'язки та відповідальність команди</h2>
+        <p className="muted small">CMO відповідає за бриф і результат запуску. Спеціалісти виконують профільні задачі, QA перевіряє незалежно.</p>
+        {floor.agents.map((a) => {
+          const profile = ROLE_CONTRACTS[a.role_key as RoleKey];
+          if (!profile) return null;
+          const manager = profile.reportsTo === "owner" ? "Власник" : ROLE_CONTRACTS[profile.reportsTo as RoleKey]?.title;
+          return <details key={a.role_key} style={{ marginBottom: 12 }}>
+            <summary>{a.display_name} · керівник: {manager}</summary>
+            <p>{profile.duties}</p>
+            <p><strong>Компетенції:</strong> {profile.skills.join(", ")}.</p>
+            <p><strong>Результат:</strong> {profile.handoff}</p>
+          </details>;
+        })}
+      </section>
+
       <div className="cols">
         <div>
           {canBrief && (
             <section className="panel" aria-labelledby="brief-title">
               <div className="panel-head">
                 <h2 id="brief-title">Новий бриф</h2>
-                <span className="muted small">Сценарій: концепції та сценарії рілсів</span>
+                <span className="muted small">Оберіть процес під вашу задачу</span>
               </div>
               <BriefForm workspaceId={ws.id} slug={ws.slug} idempotencyKey={`brief-${randomUUID()}`} catalog={PLAYBOOK_CATALOG} knowledge={knowledge.filter((k) => k.status === "approved").map((k) => ({ id: k.id, title: k.title, kind: k.kind }))} />
             </section>

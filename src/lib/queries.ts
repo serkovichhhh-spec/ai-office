@@ -127,7 +127,6 @@ export async function floorState(userId: string, ws: Workspace): Promise<Floor> 
       if (q) return { ...a, activity: "queued", detail: `У черзі · ${q.title}`, run_id: q.run_id };
       if (!a.enabled) return { ...a, activity: "off", detail: null, run_id: null };
       // Honest roster: roles that no playbook uses yet are shown as such, never as busy.
-      if (a.department === "production") return { ...a, activity: "awaiting_bridge", detail: "Працює через локальний /produce — міст ще не підключено", run_id: null };
       if (!USED_ROLES.has(a.role_key)) return { ...a, activity: "unassigned", detail: "Ще не задіяний у жодному сценарії", run_id: null };
       return { ...a, activity: "idle", detail: null, run_id: null };
     });
@@ -145,7 +144,7 @@ export async function floorState(userId: string, ws: Workspace): Promise<Floor> 
 const USED_ROLES = new Set(Object.values(PLAYBOOKS).flatMap((p) => [...p.roles]));
 
 export function activityFor(role: string): string {
-  if (["copywriter", "creative_director", "creative", "smm", "content_maker"].includes(role)) return "drafting";
+  if (["copywriter", "scriptwriter", "creative_director", "creative", "smm", "content_maker", "designer", "graphic_designer", "print_designer", "video_editor", "ads_specialist"].includes(role)) return "drafting";
   if (role === "reviewer") return "reviewing";
   if (role === "orchestrator") return "planning";
   return "researching";
