@@ -24,6 +24,15 @@ export function KnowledgeForm({ workspaceId }: { workspaceId: string }) {
           </select>
         </label>
       </div>
+      <label>
+        Рівень доступу <span className="hint">хто з AI-виконавців може це бачити</span>
+        <select name="data_class" defaultValue="internal">
+          <option value="public">Публічне (є на сайті)</option>
+          <option value="internal">Внутрішнє</option>
+          <option value="confidential">Конфіденційне (бюджети, ліди, договори)</option>
+          <option value="personal">Персональні дані (нікому з AI)</option>
+        </select>
+      </label>
       <label>Назва<input name="title" required maxLength={200} placeholder="Тон бренду" /></label>
       <label>Зміст<textarea name="body" required rows={6} maxLength={20000} /></label>
       <label>Джерело <span className="hint">посилання, необов’язково</span><input name="source_url" type="url" /></label>

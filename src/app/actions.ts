@@ -126,6 +126,7 @@ const KnowledgeInput = z.object({
   body: z.string().trim().min(2).max(20000),
   status: z.enum(["draft", "approved"]),
   source_url: z.string().trim().url().or(z.literal("")),
+  data_class: z.enum(["public", "internal", "confidential", "personal"]).default("internal"),
 });
 
 export async function addKnowledgeAction(_prev: ActionState, form: FormData): Promise<ActionState> {
@@ -135,8 +136,8 @@ export async function addKnowledgeAction(_prev: ActionState, form: FormData): Pr
   const v = parsed.data;
   try {
     await asUser(db(), user.id, (tx) => tx`
-      insert into office.knowledge_docs (workspace_id, kind, title, body, status, source_url, created_by)
-      values (${v.workspace_id}, ${v.kind}, ${v.title}, ${v.body}, ${v.status}, ${v.source_url || null}, ${user.id})`);
+      insert into office.knowledge_docs (workspace_id, kind, title, body, status, source_url, data_class, created_by)
+      values (${v.workspace_id}, ${v.kind}, ${v.title}, ${v.body}, ${v.status}, ${v.source_url || null}, ${v.data_class}, ${user.id})`);
   } catch (e) {
     return { error: friendly(e) };
   }
@@ -149,6 +150,15 @@ export async function setKnowledgeStatusAction(form: FormData): Promise<void> {
   const id = z.string().uuid().parse(form.get("id"));
   const status = z.enum(["draft", "approved", "archived"]).parse(form.get("status"));
   await asUser(db(), user.id, (tx) => tx`update office.knowledge_docs set status = ${status}, updated_at = now() where id = ${id}`);
+  revalidatePath("/w", "layout");
+}
+
+/** Owner/editor sets who may receive a knowledge record (enforced per provider policy). */
+export async function setKnowledgeClassAction(form: FormData): Promise<void> {
+  const user = await requireUser();
+  const id = z.string().uuid().parse(form.get("id"));
+  const dataClass = z.enum(["public", "internal", "confidential", "personal"]).parse(form.get("data_class"));
+  await asUser(db(), user.id, (tx) => tx`update office.knowledge_docs set data_class = ${dataClass}, updated_at = now() where id = ${id}`);
   revalidatePath("/w", "layout");
 }
 
@@ -191,6 +201,15 @@ function friendly(e: unknown): string {
   return "Не вдалося виконати дію. Спробуйте ще раз.";
 }
 
+
+/** Owner grants seats to an executor explicitly; a new executor has none. */
+export async function setExecutorSeatsAction(form: FormData): Promise<void> {
+  const user = await requireUser();
+  const id = z.string().uuid().parse(form.get("executor_id"));
+  const seats = form.getAll("seats").map(String).filter((s) => /^[a-z_]{2,40}$/.test(s));
+  await asUser(db(), user.id, (tx) => tx`select office.set_executor_seats(${id}::uuid, ${seats}::text[])`);
+  revalidatePath("/w", "layout");
+}
 
 /** Owner disconnects ChatGPT / Claude: all its tokens stop working immediately. */
 export async function revokeExecutorAction(form: FormData): Promise<void> {

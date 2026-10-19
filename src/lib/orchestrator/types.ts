@@ -45,6 +45,8 @@ export interface KnowledgeItem {
   body: string;
   source_url: string | null;
   freshness_date: string | null;
+  /** public | internal | confidential | personal (0008). */
+  data_class?: string;
 }
 
 export interface ArtifactItem {
@@ -64,6 +66,18 @@ export interface StepContext {
   agent: AgentRow | null;
   knowledge: KnowledgeItem[];
   artifacts: ArtifactItem[];
+  /** Data-governance decision for the executor that will receive this step (0008). */
+  governance?: StepGovernance;
+}
+
+export interface StepGovernance {
+  provider: string;
+  max_data_class: string | null;
+  enforced: boolean;
+  /** Highest class among the knowledge actually included. */
+  data_class: string;
+  knowledge_refs: Array<{ record_id: string; version: string; data_class: string }>;
+  excluded_count: number;
 }
 
 export interface NextStep {
@@ -71,8 +85,10 @@ export interface NextStep {
   agent_role: string;
   input?: Record<string, unknown>;
   depends_on?: string[];
-  /** Executor for this step (claude_session | chatgpt | human); defaults to the seat's configured executor. */
+  /** Executor for this step (claude_session | chatgpt | grok | human); defaults to the seat's configured executor. */
   executor?: string;
+  /** Step key whose author must not take this step (reviewer independence, checked by executor_id). */
+  independent_of_step?: string;
 }
 
 /** Payload for office.worker_complete. */

@@ -53,32 +53,62 @@ export default async function AuthorizePage({ searchParams }: { searchParams: Pr
     tx`select w.id, w.name from office.workspaces w where office.has_role(w.id, array['owner']) order by w.name`,
   );
   if (workspaces.length === 0) return <Problem text="Підключати виконавців може лише власник workspace." />;
-  const guessKind = /claude|anthropic/i.test(client.name) ? "claude_session" : "chatgpt";
+  const guessKind = /claude|anthropic/i.test(client.name) ? "claude_session" : /grok|xai/i.test(client.name) ? "grok" : "chatgpt";
   const hidden = ["client_id", "redirect_uri", "code_challenge", "state"] as const;
+  const backQuery = new URLSearchParams(Object.entries(q).filter(([, v]) => v)).toString();
+  const existing = await asUser(db(), user.id, (tx) =>
+    tx`select e.id::text, e.label, e.kind, w.name as workspace from office.executors e join office.workspaces w on w.id = e.workspace_id
+       where e.revoked_at is null and e.kind <> 'human' and office.has_role(e.workspace_id, array['owner'])
+       order by w.name, e.label`,
+  );
+  const err = one(sp.err);
+  const ERR: Record<string, string> = {
+    label: "Вкажіть назву виконавця: 2–40 латинських літер, цифр, _ або -.",
+    label_taken: "Така назва вже є в цьому workspace. Оберіть іншу або перепідключіть існуючого виконавця.",
+    executor: "Цього виконавця не знайдено або його відключено.",
+    owner: "Підключати виконавців може лише власник workspace.",
+    failed: "Не вдалося підключити. Спробуйте ще раз.",
+  };
+  const suggested = guessKind === "claude_session" ? "claude-main" : guessKind === "grok" ? "grok-main" : "gpt-a";
 
   return (
-    <main className="login" style={{ maxWidth: 460 }}>
+    <main className="login" style={{ maxWidth: 480 }}>
       <div className="panel">
         <div className="brand" style={{ marginBottom: 18 }}><Logo /> AI Office</div>
         <h1 style={{ fontSize: 20, marginBottom: 6 }}>Підключити «{client.name}»?</h1>
         <p className="muted small" style={{ marginBottom: 14 }}>
           Застосунок зможе бачити задачі, призначені цьому виконавцю, брати їх у роботу й здавати результати.
-          Затверджувати роботу, змінювати бриф чи знання він не зможе. Відключити можна будь-коли.
+          Затверджувати роботу, змінювати бриф чи знання він не зможе. Новий виконавець стартує без ролей —
+          їх видає власник у панелі «Виконавці». Відключити можна будь-коли.
         </p>
+        {err && <p className="error" role="alert">{ERR[err] ?? ERR.failed}</p>}
         <form action={approveAction} className="form-grid">
           {hidden.map((k) => <input key={k} type="hidden" name={k} value={q[k]} />)}
-          <label>Workspace
+          <input type="hidden" name="back" value={backQuery} />
+          <label>Підключення
+            <select name="target" defaultValue="new">
+              <option value="new">Новий виконавець</option>
+              {existing.map((e) => (
+                <option key={String(e.id)} value={String(e.id)}>Перепідключити: {String(e.label)} · {String(e.workspace)}</option>
+              ))}
+            </select>
+          </label>
+          <label>Назва нового виконавця <span className="hint">напр. gpt-a, chatgpt_creative; для перепідключення не потрібна</span>
+            <input name="label" defaultValue={suggested} maxLength={40} pattern="[a-z0-9][a-z0-9_\-]{1,39}" />
+          </label>
+          <label>Workspace <span className="hint">для нового виконавця</span>
             <select name="workspace_id" defaultValue={String(workspaces[0].id)}>
               {workspaces.map((w) => <option key={String(w.id)} value={String(w.id)}>{String(w.name)}</option>)}
             </select>
           </label>
-          <label>Хто виконує задачі
+          <label>Хто виконує задачі <span className="hint">для нового виконавця</span>
             <select name="kind" defaultValue={guessKind}>
               <option value="chatgpt">ChatGPT</option>
               <option value="claude_session">Claude</option>
+              <option value="grok">Grok</option>
             </select>
           </label>
-          <p className="muted small">Вхід як {user.email}</p>
+          <p className="muted small">Вхід як власник workspace</p>
           <button className="btn approve">Дозволити</button>
         </form>
         <form action={denyAction} style={{ marginTop: 8 }}>

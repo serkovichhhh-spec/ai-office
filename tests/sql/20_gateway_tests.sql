@@ -14,6 +14,8 @@ insert into t.tok values
   ('gpt_b',  office.create_executor('gtu', 'chatgpt', 'ChatGPT GTU'));
 insert into t.tok select 'listonly', office.create_executor('pavutyna', 'chatgpt', 'List only');
 update office.executors set allowed_ops = array['list'] where name = 'List only';
+-- 0008: new executors start with no seats; these fixtures get every seat explicitly.
+update office.executors x set allowed_seats = (select array_agg(a.role_key) from office.agents a where a.workspace_id = x.workspace_id);
 create function t.h(p_key text) returns text language sql stable as $$
   select encode(sha256(convert_to(v, 'UTF8')), 'hex') from t.tok where k = p_key $$;
 grant execute on function t.h(text) to public;

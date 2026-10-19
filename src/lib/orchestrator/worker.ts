@@ -49,8 +49,9 @@ export async function tick(sql: postgres.Sql, ai: AiProvider, opts: TickOptions)
       );
     }, opts.heartbeatMs ?? 30_000);
 
+    let ctx: StepContext | undefined;
     try {
-      const [{ ctx }] = await sql<{ ctx: StepContext }[]>`select office.worker_context(${step.id}) as ctx`;
+      [{ ctx }] = await sql<{ ctx: StepContext }[]>`select office.worker_context(${step.id}) as ctx`;
       const result = await executeStep(ctx, providerForStep(ai, step.agent_response));
       const [{ r }] = await sql<{ r: { accepted: boolean; reason?: string } }[]>`
         select office.worker_complete(${step.id}, ${opts.workerId}, ${step.attempt}, ${sql.json(result as never)}) as r`;
@@ -61,7 +62,9 @@ export async function tick(sql: postgres.Sql, ai: AiProvider, opts: TickOptions)
       }
     } catch (e) {
       if (e instanceof AgentNeededError) {
-        await sql`select office.worker_park(${step.id}, ${opts.workerId}, ${step.attempt}, ${sql.json(e.request as never)})`;
+        // The governance decision travels with the request so the gateway can gate and audit the hand-off.
+        const request = ctx?.governance ? { ...e.request, governance: ctx.governance } : e.request;
+        await sql`select office.worker_park(${step.id}, ${opts.workerId}, ${step.attempt}, ${sql.json(request as never)})`;
         report.parked++;
         continue;
       }

@@ -2,7 +2,10 @@ import "server-only";
 import { asUser, db } from "./db";
 import { PLAYBOOKS, stepTitle } from "./orchestrator/registry";
 
-export const EXECUTOR_LABEL: Record<string, string> = { claude_session: "Claude", chatgpt: "ChatGPT", human: "людину" };
+export const EXECUTOR_LABEL: Record<string, string> = { claude_session: "Claude", chatgpt: "ChatGPT", grok: "Grok", human: "людину" };
+export const DATA_CLASS_LABEL: Record<string, string> = {
+  public: "публічне", internal: "внутрішнє", confidential: "конфіденційне", personal: "персональні дані",
+};
 
 function hhmm(ts: string | null): string {
   if (!ts) return "—";
@@ -247,11 +250,12 @@ export async function runDetail(userId: string, runId: string): Promise<RunDetai
 
 export interface KnowledgeDoc {
   id: string; kind: string; title: string; body: string; status: string; source_url: string | null; updated_at: string;
+  data_class: string;
 }
 
 export async function listKnowledge(userId: string, wsId: string): Promise<KnowledgeDoc[]> {
   return asUser(db(), userId, (tx) => tx<KnowledgeDoc[]>`
-    select id, kind, title, body, status, source_url, updated_at from office.knowledge_docs
+    select id, kind, title, body, status, source_url, updated_at, data_class from office.knowledge_docs
     where workspace_id = ${wsId} and status <> 'archived' order by status, kind, title`);
 }
 
@@ -259,6 +263,10 @@ export interface ExecutorRow {
   id: string;
   kind: string;
   name: string;
+  label: string;
+  provider: string;
+  allowed_seats: string[];
+  max_data_class: string | null;
   last_seen_at: string | null;
   created_at: string;
 }
@@ -266,6 +274,12 @@ export interface ExecutorRow {
 /** Connected executors (ChatGPT, Claude) of a workspace. Token hashes are never readable by users. */
 export async function executors(userId: string, wsId: string): Promise<ExecutorRow[]> {
   return asUser(db(), userId, (tx) => tx<ExecutorRow[]>`
-    select id, kind, name, last_seen_at::text, created_at::text from office.executors
-    where workspace_id = ${wsId} and revoked_at is null order by created_at`);
+    select e.id, e.kind, e.name, e.label, e.provider, e.allowed_seats,
+           (select case when p.max_data_class is null then null
+                        when p.verified_at is null or p.verified_at < now() - interval '90 days' then 'public'
+                        else p.max_data_class end
+            from office.provider_policies p where p.provider = e.provider) as max_data_class,
+           e.last_seen_at::text, e.created_at::text
+    from office.executors e
+    where e.workspace_id = ${wsId} and e.revoked_at is null order by e.created_at`);
 }

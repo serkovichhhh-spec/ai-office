@@ -1,8 +1,8 @@
 import { randomUUID } from "node:crypto";
 import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/supabase";
-import { EXECUTOR_LABEL, executors, floorState, listHandoffs, listKnowledge, listRuns, workspaceBySlug } from "@/lib/queries";
-import { revokeExecutorAction } from "../../actions";
+import { DATA_CLASS_LABEL, EXECUTOR_LABEL, executors, floorState, listHandoffs, listKnowledge, listRuns, workspaceBySlug } from "@/lib/queries";
+import { revokeExecutorAction, setExecutorSeatsAction } from "../../actions";
 import { PixelAvatar } from "../../components/PixelAvatar";
 import { LiveRefresh } from "../../components/LiveRefresh";
 import { ACTIVITY, HANDOFF_STATUS, ProviderBadge, StatusPill, StubBadge, usd, when } from "../../components/ui";
@@ -152,10 +152,35 @@ export default async function OfficePage({ params }: { params: Promise<{ slug: s
             ) : (
               <ul className="list">
                 {execs.map((e) => (
-                  <li key={e.id} className="row">
+                  <li key={e.id} className="row" style={{ alignItems: "flex-start" }}>
                     <div className="row-main">
-                      <div className="row-title">{e.name} <span className="pill">{EXECUTOR_LABEL[e.kind] ?? e.kind}</span></div>
-                      <div className="row-meta">{e.last_seen_at ? `Останнє звернення ${when(e.last_seen_at)}` : "Ще не звертався"}</div>
+                      <div className="row-title">{e.label} <span className="pill">{EXECUTOR_LABEL[e.kind] ?? e.kind}</span></div>
+                      <div className="row-meta">
+                        {e.allowed_seats.length === 0
+                          ? "Ролей не видано — задач не бачить"
+                          : `Ролі: ${e.allowed_seats.map((s) => floor.agents.find((a) => a.role_key === s)?.display_name ?? s).join(", ")}`}
+                      </div>
+                      <div className="row-meta">
+                        Дані: {e.max_data_class ? `до рівня «${DATA_CLASS_LABEL[e.max_data_class]}»` : "заборонено політикою"} ·{" "}
+                        {e.last_seen_at ? `останнє звернення ${when(e.last_seen_at)}` : "ще не звертався"}
+                      </div>
+                      {ws.role === "owner" && (
+                        <details style={{ marginTop: 6 }}>
+                          <summary className="small">Ролі виконавця</summary>
+                          <form action={setExecutorSeatsAction} className="form-grid" style={{ marginTop: 6 }}>
+                            <input type="hidden" name="executor_id" value={e.id} />
+                            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))", gap: 4 }}>
+                              {floor.agents.filter((a) => a.role_key !== "orchestrator").map((a) => (
+                                <label key={a.role_key} className="small" style={{ display: "flex", gap: 6, alignItems: "center", fontWeight: 400 }}>
+                                  <input type="checkbox" name="seats" value={a.role_key} defaultChecked={e.allowed_seats.includes(a.role_key)} />
+                                  {a.display_name}
+                                </label>
+                              ))}
+                            </div>
+                            <div><button className="btn">Зберегти ролі</button></div>
+                          </form>
+                        </details>
+                      )}
                     </div>
                     {ws.role === "owner" && (
                       <form action={revokeExecutorAction}>

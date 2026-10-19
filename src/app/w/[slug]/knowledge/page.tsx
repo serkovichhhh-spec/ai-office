@@ -1,8 +1,8 @@
 import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/supabase";
-import { listKnowledge, workspaceBySlug } from "@/lib/queries";
+import { DATA_CLASS_LABEL, listKnowledge, workspaceBySlug } from "@/lib/queries";
 import { when } from "../../../components/ui";
-import { setKnowledgeStatusAction } from "../../../actions";
+import { setKnowledgeClassAction, setKnowledgeStatusAction } from "../../../actions";
 import { KnowledgeForm } from "./KnowledgeForm";
 
 export const dynamic = "force-dynamic";
@@ -21,7 +21,7 @@ export default async function KnowledgePage({ params }: { params: Promise<{ slug
       <section className="panel" aria-labelledby="k-title">
         <div className="panel-head">
           <h2 id="k-title">Знання {ws.name}</h2>
-          <span className="muted small">Агенти бачать лише затверджене</span>
+          <span className="muted small">Агенти бачать лише затверджене й лише свій рівень доступу</span>
         </div>
         {docs.length === 0 ? (
           <p className="empty">Поки порожньо. Додайте тон бренду, ключові факти й пропозиції — без них агенти не використовуватимуть жодних фактів.</p>
@@ -35,7 +35,7 @@ export default async function KnowledgePage({ params }: { params: Promise<{ slug
                 </div>
                 <p className="small" style={{ whiteSpace: "pre-wrap", marginTop: 4 }}>{d.body}</p>
                 <p className="small muted" style={{ marginTop: 4 }}>
-                  Оновлено {when(d.updated_at)}{d.source_url ? <>, <a href={d.source_url} rel="noreferrer" target="_blank">джерело</a></> : null}
+                  Доступ: {DATA_CLASS_LABEL[d.data_class] ?? d.data_class} · Оновлено {when(d.updated_at)}{d.source_url ? <>, <a href={d.source_url} rel="noreferrer" target="_blank">джерело</a></> : null}
                 </p>
                 {canEdit && (
                   <div style={{ display: "flex", gap: 8, marginTop: 6 }}>
@@ -48,6 +48,13 @@ export default async function KnowledgePage({ params }: { params: Promise<{ slug
                       <input type="hidden" name="id" value={d.id} />
                       <input type="hidden" name="status" value="archived" />
                       <button className="btn link">В архів</button>
+                    </form>
+                    <form action={setKnowledgeClassAction} style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                      <input type="hidden" name="id" value={d.id} />
+                      <select name="data_class" defaultValue={d.data_class} aria-label="Рівень доступу">
+                        {Object.entries(DATA_CLASS_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                      </select>
+                      <button className="btn link">Змінити доступ</button>
                     </form>
                   </div>
                 )}

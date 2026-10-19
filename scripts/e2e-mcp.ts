@@ -46,6 +46,8 @@ async function main() {
     const [{ t: claudeToken }] = await su`select office.create_executor('pavutyna', 'claude_session', 'Claude task') as t`;
     await su`insert into office.workspaces (slug, name) values ('gtu', 'GTU')`;
     const [{ t: otherToken }] = await su`select office.create_executor('gtu', 'chatgpt', 'GTU ChatGPT') as t`;
+    // 0008: executors start without seats — grant them explicitly, as the owner does in the panel.
+    await su`update office.executors x set allowed_seats = coalesce((select array_agg(a.role_key) from office.agents a where a.workspace_id = x.workspace_id), '{}')`;
 
     const u = new URL(dbUrl);
     u.username = "office_app";
@@ -117,6 +119,11 @@ async function main() {
     const attempts = await su`select x.state, e.kind from office.execution_attempts x join office.executors e on e.id = x.executor_id order by x.claimed_at`;
     check("every attempt validated, with executor recorded", attempts.length === 3 && attempts.every((a) => a.state === "validated"), attempts);
     check("executors alternate ChatGPT/Claude/ChatGPT", attempts.map((a) => a.kind).join(",") === "chatgpt,claude_session,chatgpt");
+    const transfers = await su`select provider, op, data_class, jsonb_array_length(knowledge_refs) as refs from office.external_transfers where run_id = ${runId} and op = 'claim' order by at`;
+    check("every hand-off audited with provider and data class (0008)",
+      transfers.map((t) => `${t.provider}:${t.data_class}`).join(",") === "openai:internal,anthropic:internal,openai:internal", transfers);
+    const parked = await su`select count(*)::int as n from office.steps where run_id = ${runId} and agent_request ? 'governance'`;
+    check("parked requests carry the governance decision", parked[0].n === 3, parked);
     const arts = await su`select kind, model from office.artifacts where run_id = ${runId} and kind in ('strategy','scripts','review') order by created_at`;
     check("artifacts credit the real author", arts.map((a) => `${a.kind}:${a.model}`).join(",") === "strategy:chatgpt,scripts:claude-session,review:chatgpt", arts);
     const status = (await tool(gpt, "office_get_team_status")).structuredContent;

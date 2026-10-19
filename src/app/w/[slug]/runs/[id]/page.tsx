@@ -34,9 +34,9 @@ const EVENT_TEXT: Record<string, (e: RunDetail["events"][number]) => string> = {
   "run.budget_exceeded": () => "Зупинено: вичерпано бюджет",
   "run.max_steps": () => "Зупинено: забагато кроків",
   "step.awaiting_agent": (e) => `${role(e.agent_role)}: ${stepLabel(String(e.payload.step))} чекає на ${who(e.payload.executor)}${e.payload.note ? " (повтор: відповідь не пройшла перевірку)" : ""}`,
-  "attempt.claimed": (e) => `${role(e.agent_role)}: ${String(e.payload.executor_name ?? who(e.payload.executor))} взяв у роботу — ${stepLabel(String(e.payload.step))}, оренда до ${clock(String(e.payload.lease_expires_at))}`,
+  "attempt.claimed": (e) => `${role(e.agent_role)}: ${String(e.payload.executor_label ?? e.payload.executor_name ?? who(e.payload.executor))} взяв у роботу — ${stepLabel(String(e.payload.step))}, оренда до ${clock(String(e.payload.lease_expires_at))}`,
   "attempt.saved_as_proposal": (e) => `${role(e.agent_role)}: результат від ${who(e.payload.executor)} збережено як пропозицію, не застосовано (${PROPOSAL[String(e.payload.reason)] ?? e.payload.reason})`,
-  "step.agent_submitted": (e) => `${role(e.agent_role)}: ${String(e.payload.executor_name ?? who(e.payload.executor))} передав результат — ${stepLabel(String(e.payload.step))}`,
+  "step.agent_submitted": (e) => `${role(e.agent_role)}: ${String(e.payload.executor_label ?? e.payload.executor_name ?? who(e.payload.executor))} передав результат — ${stepLabel(String(e.payload.step))}`,
 };
 const PROPOSAL: Record<string, string> = { lease_expired: "оренда минула", task_no_longer_waiting: "задача вже неактуальна", inputs_changed: "вхідні дані змінилися" };
 const who = (k: unknown) => EXECUTOR_LABEL[String(k ?? "claude_session")] ?? String(k);
