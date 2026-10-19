@@ -28,8 +28,7 @@ begin
   select b.playbook_version into new.playbook_version from office.briefs b where b.id = new.brief_id;
   return new;
 end $$;
-drop trigger if exists runs_playbook_version on office.runs;
-create trigger runs_playbook_version before insert on office.runs
+create or replace trigger runs_playbook_version before insert on office.runs
   for each row execute function office.run_playbook_version();
 
 create or replace function office.create_brief(p_workspace uuid, p jsonb) returns uuid
@@ -166,8 +165,7 @@ begin
   end if;
   return new;
 end $$;
-drop trigger if exists approvals_outcome_gate on office.approvals;
-create trigger approvals_outcome_gate before insert on office.approvals
+create or replace trigger approvals_outcome_gate before insert on office.approvals
   for each row execute function office.approval_outcome_gate();
 
 revoke all on function office.run_playbook_version(), office.knowledge_version(office.knowledge_docs),
