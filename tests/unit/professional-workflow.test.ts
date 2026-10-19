@@ -99,7 +99,7 @@ describe("professional workflow", () => {
 
   it("owner revisions restart at CMO and persist the decision", async () => {
     const r = await playbookFor("outdoor_print_pack", 2).execute(ctx("revision_intake", [], { owner_feedback: "Спочатку дослідити конкурентів" }), fixtureProvider(readyBrief()));
-    expect(r.next_steps[0]).toMatchObject({ step_key: "marketing_brief", agent_role: "orchestrator", executor: "chatgpt" });
+    expect(r.next_steps[0]).toMatchObject({ step_key: "diagnosis", agent_role: "orchestrator", executor: "chatgpt" });
     expect(r.artifacts[0].content).toMatchObject({ feedback: "Спочатку дослідити конкурентів" });
   });
 
@@ -142,7 +142,7 @@ describe("professional workflow", () => {
         for (const n of r.next_steps) assigned[n.step_key] = n.executor;
         queue = r.next_steps.map((n) => ({ step_key: n.step_key, input: n.input ?? {} }));
       }
-      expect(trail).toEqual(["intake", "marketing_brief", "prepare", "build", "review", "package"]);
+      expect(trail).toEqual(["intake", "diagnosis", "marketing_brief", "prepare", "build", "review", ...(["outdoor_print_pack","graphic_design_pack","campaign_art_direction","creative_ideation","reels_concepts"].includes(pb.key)?["challenge"]:[]), "package"]);
       expect(prompts.every((p) => p.includes("marketing_brief v1"))).toBe(true);
       expect(assigned.build).toBe("chatgpt"); expect(assigned.review).toBe("claude_session");
       const pkg = artifacts.find((a) => a.kind === "deliverable")!.content as Record<string, unknown>;

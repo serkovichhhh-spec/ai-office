@@ -126,7 +126,7 @@ export default async function RunPage({ params }: { params: Promise<{ slug: stri
         <div>
           {canDecide && latest && (
             <div className="mobile-first-decision">
-              <DecisionPanel artifactId={latest.id} version={latest.version} canApprove={!pkgV1?.outcome || pkgV1.outcome === "ready_for_approval"} />
+              <DecisionPanel artifactId={latest.id} version={latest.version} canApproveConcept={ws.role === "owner" && pkgV1?.outcome === "conditional"} canApprove={!pkgV1?.outcome || pkgV1.outcome === "ready_for_approval"} />
             </div>
           )}
 
@@ -212,7 +212,7 @@ export default async function RunPage({ params }: { params: Promise<{ slug: stri
         </div>
 
         <div>
-          {canDecide && latest && <div className="desktop-decision"><DecisionPanel artifactId={latest.id} version={latest.version} canApprove={!pkgV1?.outcome || pkgV1.outcome === "ready_for_approval"} /></div>}
+          {canDecide && latest && <div className="desktop-decision"><DecisionPanel artifactId={latest.id} version={latest.version} canApproveConcept={ws.role === "owner" && pkgV1?.outcome === "conditional"} canApprove={!pkgV1?.outcome || pkgV1.outcome === "ready_for_approval"} /></div>}
 
           {d.handoff && (
             <section className="panel">

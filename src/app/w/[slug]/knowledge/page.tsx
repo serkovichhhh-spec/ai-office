@@ -7,7 +7,7 @@ import { KnowledgeForm } from "./KnowledgeForm";
 
 export const dynamic = "force-dynamic";
 
-const KIND: Record<string, string> = { brand: "Бренд", fact: "Факт", audience: "Аудиторія", offer: "Пропозиція", decision: "Рішення", other: "Інше" };
+const KIND: Record<string, string> = { brand: "Бренд", fact: "Факт", audience: "Аудиторія", offer: "Пропозиція", decision: "Рішення", other: "Інше",market:"Ринок",insight:"Інсайт",case:"Кейс",argument:"Аргумент",result:"Результат",rejected_idea:"Відхилена ідея",taste_rule:"Творчий принцип" };
 
 export default async function KnowledgePage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
@@ -37,7 +37,10 @@ export default async function KnowledgePage({ params }: { params: Promise<{ slug
                 <p className="small muted" style={{ marginTop: 4 }}>
                   Оновлено {when(d.updated_at)}{d.source_url ? <>, <a href={d.source_url} rel="noreferrer" target="_blank">джерело</a></> : null}
                 </p>
-                {canEdit && (
+                {d.confidence && <p className="small muted">Упевненість: {d.confidence}{d.expires_at?` · чинне до ${d.expires_at}`:""}</p>}
+                {(d.sources??[]).map((s,i)=><p className="small" key={i}><a href={s.url} target="_blank" rel="noreferrer">{s.title}</a> · перевірено {s.accessed_at}</p>)}
+                {d.origin_run_id && <p className="small"><a href={`/w/${ws.slug}/runs/${d.origin_run_id}`}>Дослідження-джерело</a></p>}
+                {canEdit && (!d.origin_run_id || ws.role === "owner") && (
                   <div style={{ display: "flex", gap: 8, marginTop: 6 }}>
                     <form action={setKnowledgeStatusAction}>
                       <input type="hidden" name="id" value={d.id} />

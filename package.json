@@ -14,7 +14,8 @@
     "test": "vitest run",
     "test:sql": "bash tests/sql/run.sh",
     "test:e2e-local": "tsx scripts/e2e-local.ts",
-    "test:e2e-mcp": "tsx scripts/e2e-mcp.ts"
+    "test:e2e-mcp": "tsx scripts/e2e-mcp.ts",
+    "test:sql:embedded": "node --import tsx scripts/test-sql-embedded.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.7",
@@ -28,6 +29,7 @@
     "zod": "^4.6.7"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "0.5.10",
     "@types/node": "^26.6.5",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",

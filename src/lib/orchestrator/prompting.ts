@@ -40,6 +40,7 @@ export function knowledgeText(items: KnowledgeItem[]): string {
 }
 
 export function composeSystem(agentPrompt: string | undefined, taskRole: string, roleKey?: string): string {
+  if (!roleKey) return `${(agentPrompt ?? "").trim() || taskRole}\n\n${DATA_RULES}`;
   // A stale workspace prompt must not erase the current step's actual specialisation.
   const standard = roleInstructions(roleKey);
   const extra = (agentPrompt ?? "").trim();

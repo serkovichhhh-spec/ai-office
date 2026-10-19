@@ -17,7 +17,7 @@ export async function approveAction(form: FormData): Promise<void> {
   const redirectUri = f("redirect_uri");
   // The database re-checks that redirect_uri is registered for this client before anything is issued.
   const [{ code }] = await asUser(db(), user.id, (tx) =>
-    tx`select office.oauth_authorize(${f("client_id")}, ${redirectUri}, ${f("code_challenge")}, ${f("workspace_id")}::uuid, ${f("kind")}) as code`,
+    tx`select office.oauth_authorize(${f("client_id")}, ${redirectUri}, ${f("code_challenge")}, ${f("workspace_id")}::uuid, ${f("kind")}, ${f("executor_id") || null}::uuid, ${f("label") || null}) as code`,
   );
   back(redirectUri, { code: code as string, state: f("state") });
 }

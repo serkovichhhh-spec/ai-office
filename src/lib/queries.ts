@@ -246,15 +246,24 @@ export async function runDetail(userId: string, runId: string): Promise<RunDetai
 
 export interface KnowledgeDoc {
   id: string; kind: string; title: string; body: string; status: string; source_url: string | null; updated_at: string;
+  origin_run_id?: string | null; confidence?: string | null; expires_at?:string|null;
+  sources?:{url:string;title:string;accessed_at:string}[];
 }
 
 export async function listKnowledge(userId: string, wsId: string): Promise<KnowledgeDoc[]> {
   return asUser(db(), userId, (tx) => tx<KnowledgeDoc[]>`
-    select id, kind, title, body, status, source_url, updated_at from office.knowledge_docs
+    select id, kind, title, body, status, source_url, updated_at,
+      to_jsonb(k)->>'origin_run_id' as origin_run_id,to_jsonb(k)->>'confidence' as confidence,
+      to_jsonb(k)->>'expires_at' as expires_at,coalesce(to_jsonb(k)->'sources','[]'::jsonb) as sources
+      from office.knowledge_docs k
     where workspace_id = ${wsId} and status <> 'archived' order by status, kind, title`);
 }
 
 export interface ExecutorRow {
+  label: string;
+  mode: string;
+  allowed_seats: string[] | null;
+  capabilities: Record<string, {verified_at?: string | null; evidence?: string}>;
   id: string;
   kind: string;
   name: string;
@@ -265,6 +274,8 @@ export interface ExecutorRow {
 /** Connected executors (ChatGPT, Claude) of a workspace. Token hashes are never readable by users. */
 export async function executors(userId: string, wsId: string): Promise<ExecutorRow[]> {
   return asUser(db(), userId, (tx) => tx<ExecutorRow[]>`
-    select id, kind, name, last_seen_at::text, created_at::text from office.executors
+    select id, kind, name, to_jsonb(e)->>'label' as label,
+      coalesce(to_jsonb(e)->>'mode','interactive') as mode, allowed_seats,
+      coalesce(to_jsonb(e)->'capabilities','{}'::jsonb) as capabilities, last_seen_at::text, created_at::text from office.executors e
     where workspace_id = ${wsId} and revoked_at is null order by created_at`);
 }

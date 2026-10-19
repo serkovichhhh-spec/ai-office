@@ -67,7 +67,6 @@ function pack(ctx: StepContext): StepResult {
   if (!strat || !scr) throw new Error("package: missing strategy or scripts artifact");
   const providers = new Set(ctx.artifacts.map((a) => (a.content as { _provider?: string })?._provider).filter(Boolean));
   const content = {
-    outcome: rev?.content.verdict === "pass" && !providers.has("stub") ? "ready_for_approval" : "escalated",
     brief: { id: ctx.brief.id, title: ctx.brief.title, objective: ctx.brief.objective, channel: ctx.brief.channel },
     revision: ctx.run.revision,
     strategy_summary: strat.content.summary,
@@ -96,7 +95,7 @@ async function strategy(ctx: StepContext, ai: AiProvider): Promise<StepResult> {
     schemaName: "strategy",
     schema: StrategySchema,
     tier: ctx.agent?.model_tier ?? "balanced",
-    system: composeSystem(ctx.agent?.system_prompt, "Ти — маркетинговий стратег.", "strategist"),
+    system: composeSystem(ctx.agent?.system_prompt, "Ти — маркетинговий стратег."),
     user: [
       `Сформуй ${n} різних кутів подачі для брифу workspace «${ctx.workspace.name}».`,
       dataBlock("brief", briefText(b)),
@@ -134,7 +133,7 @@ async function scripts(ctx: StepContext, ai: AiProvider): Promise<StepResult> {
     schema: ScriptsSchema,
     tier: ctx.agent?.model_tier ?? "balanced",
     maxOutputTokens: 6000,
-    system: composeSystem(ctx.agent?.system_prompt, "Ти — копірайтер коротких відео. Цей застарілий плейбук підтримує лише рілси.", "copywriter"),
+    system: composeSystem(ctx.agent?.system_prompt, "Ти — копірайтер коротких відео."),
     user: [
       `Напиши рівно ${b.deliverable_count} сценаріїв рілсів за стратегією. Кожен — окремий кут подачі.`,
       dataBlock("brief", briefText(b)),
@@ -181,15 +180,11 @@ async function review(ctx: StepContext, ai: AiProvider): Promise<StepResult> {
     schemaName: "review",
     schema: ReviewSchema,
     tier: ctx.agent?.model_tier ?? "fast",
-    system: composeSystem(ctx.agent?.system_prompt, "Ти — QA-рев'юер маркетингових матеріалів.", "reviewer"),
+    system: composeSystem(ctx.agent?.system_prompt, "Ти — QA-рев'юер маркетингових матеріалів."),
     user: [
       "Перевір сценарії на відповідність брифу та критеріям приймання. Познач твердження без джерела в <knowledge>.",
       "verdict = revise лише якщо є проблеми рівня high або порушено критерій приймання.",
       dataBlock("brief", briefText(b)),
-      ...["strategy", "review"].flatMap((kind) => {
-        const a = latestArtifact(ctx, kind);
-        return a ? [dataBlock("artifact", `${kind} v${a.version}:\n${JSON.stringify(a.content)}`)] : [];
-      }),
       dataBlock("artifact", JSON.stringify(scr.content)),
       dataBlock("knowledge", knowledgeText(ctx.knowledge)),
       ownerBlock(ctx.step.input),

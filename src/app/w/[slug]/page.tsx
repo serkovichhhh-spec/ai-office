@@ -2,12 +2,12 @@ import { randomUUID } from "node:crypto";
 import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/supabase";
 import { EXECUTOR_LABEL, executors, floorState, listHandoffs, listKnowledge, listRuns, workspaceBySlug } from "@/lib/queries";
-import { revokeExecutorAction } from "../../actions";
+import { configureExecutorAction, revokeExecutorAction } from "../../actions";
 import { PixelAvatar } from "../../components/PixelAvatar";
 import { LiveRefresh } from "../../components/LiveRefresh";
 import { ACTIVITY, HANDOFF_STATUS, ProviderBadge, StatusPill, StubBadge, usd, when } from "../../components/ui";
 import { BriefForm } from "./BriefForm";
-import { PLAYBOOK_CATALOG } from "@/lib/orchestrator/registry";
+import { catalogForWorkspace } from "@/lib/orchestrator/registry";
 import { ROLE_CONTRACTS, type RoleKey } from "@/lib/orchestrator/role-contracts";
 
 export const dynamic = "force-dynamic";
@@ -111,7 +111,7 @@ export default async function OfficePage({ params }: { params: Promise<{ slug: s
                 <h2 id="brief-title">Новий бриф</h2>
                 <span className="muted small">Оберіть процес під вашу задачу</span>
               </div>
-              <BriefForm workspaceId={ws.id} slug={ws.slug} idempotencyKey={`brief-${randomUUID()}`} catalog={PLAYBOOK_CATALOG} knowledge={knowledge.filter((k) => k.status === "approved").map((k) => ({ id: k.id, title: k.title, kind: k.kind }))} />
+              <BriefForm workspaceId={ws.id} slug={ws.slug} idempotencyKey={`brief-${randomUUID()}`} catalog={catalogForWorkspace(ws.slug)} knowledge={knowledge.filter((k) => k.status === "approved").map((k) => ({ id: k.id, title: k.title, kind: k.kind }))} />
             </section>
           )}
           <section className="panel" aria-labelledby="runs-title">
@@ -171,14 +171,25 @@ export default async function OfficePage({ params }: { params: Promise<{ slug: s
                 {execs.map((e) => (
                   <li key={e.id} className="row">
                     <div className="row-main">
-                      <div className="row-title">{e.name} <span className="pill">{EXECUTOR_LABEL[e.kind] ?? e.kind}</span></div>
+                      <div className="row-title">{e.label} · {e.name} <span className="pill">{EXECUTOR_LABEL[e.kind] ?? e.kind}</span></div>
                       <div className="row-meta">{e.last_seen_at ? `Останнє звернення ${when(e.last_seen_at)}` : "Ще не звертався"}</div>
                     </div>
                     {ws.role === "owner" && (
+                      <div>{e.label && <details><summary>Налаштувати ролі та можливості</summary>
+                        <form action={configureExecutorAction} className="form-grid">
+                          <input type="hidden" name="executor_id" value={e.id} />
+                          <label>Ім'я<input name="label" required pattern="[a-z][a-z0-9_]+" maxLength={64} defaultValue={e.label} /></label>
+                          <label>Дозволені ролі через кому<input name="seats" defaultValue={(e.allowed_seats ?? floor.agents.map(a=>a.role_key)).join(", ")} /></label>
+                          <label>Режим<select name="mode" defaultValue={e.mode}><option value="interactive">Сесія</option><option value="triggered">Агент за тригером</option></select></label>
+                          <label>Підтверджені можливості (JSON)<textarea name="capabilities" rows={5} defaultValue={JSON.stringify(e.capabilities,null,2)} /></label>
+                          <p className="muted small">Для перевіреної можливості вкажіть verified_at та evidence з результатом тесту. Порожній список ролей забороняє всі задачі.</p>
+                          <button className="btn">Зберегти</button>
+                        </form>
+                      </details>}
                       <form action={revokeExecutorAction}>
                         <input type="hidden" name="executor_id" value={e.id} />
                         <button className="btn link">Відключити</button>
-                      </form>
+                      </form></div>
                     )}
                   </li>
                 ))}

@@ -3,6 +3,7 @@ import type { AiProvider, GenerateRequest, GenerateResult } from "./types";
 
 /** What a Claude session needs to do the step: prompts plus the exact output contract. */
 export interface AgentRequest {
+  skills?: import("../orchestrator/skills").SkillPackage[];
   schemaName: string;
   jsonSchema: Record<string, unknown>;
   system: string;
@@ -39,7 +40,7 @@ export class SessionProvider implements AiProvider {
   async generate<T>(req: GenerateRequest<T>): Promise<GenerateResult<T>> {
     const jsonSchema = req.jsonSchema ?? (z.toJSONSchema(req.schema, { target: "draft-7" }) as Record<string, unknown>);
     delete jsonSchema.$schema;
-    const base: AgentRequest = { schemaName: req.schemaName, jsonSchema, system: req.system, user: req.user, tier: req.tier };
+    const base: AgentRequest = { schemaName: req.schemaName, skills:req.skills, jsonSchema, system: req.system, user: req.user, tier: req.tier };
 
     if (!this.response || this.response.schemaName !== req.schemaName) {
       throw new AgentNeededError(base);

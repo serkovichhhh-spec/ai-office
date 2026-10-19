@@ -1,6 +1,6 @@
 "use server";
 import { safeNext } from "@/lib/mcp/oauth";
-import { PLAYBOOK_CATALOG } from "@/lib/orchestrator/registry";
+import { catalogForWorkspace } from "@/lib/orchestrator/registry";
 
 import { after } from "next/server";
 import { redirect } from "next/navigation";
@@ -43,8 +43,11 @@ export async function submitBriefAction(_prev: ActionState, form: FormData): Pro
   const parsed = BriefInput.safeParse(Object.fromEntries(form));
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Перевірте поля брифу" };
   const v = parsed.data;
-  const pb = PLAYBOOK_CATALOG.find((p) => p.key === String(form.get("playbook_key") ?? "") && p.version === Number(form.get("playbook_version") ?? 0))
-    ?? PLAYBOOK_CATALOG.find((p) => p.key === String(form.get("playbook_key") ?? ""));
+  const [workspace] = await asUser(db(),user.id,tx => tx`select slug from office.workspaces where id=${v.workspace_id}`);
+  if (!workspace || workspace.slug !== v.slug) return {error:"Workspace не знайдено"};
+  const catalog = catalogForWorkspace(String(workspace.slug));
+  const pb = catalog.find((p) => p.key === String(form.get("playbook_key") ?? "") && p.version === Number(form.get("playbook_version") ?? 0))
+    ?? catalog.find((p) => p.key === String(form.get("playbook_key") ?? ""));
   if (!pb) return { error: "Невідомий тип задачі" };
   if (v.deliverable_count > pb.maxCount) return { error: `Для цього типу задачі — не більше ${pb.maxCount} результатів` };
   const fields: Record<string, string | number | string[]> = {};
@@ -100,10 +103,12 @@ export async function submitBriefAction(_prev: ActionState, form: FormData): Pro
 export async function decideAction(_prev: ActionState, form: FormData): Promise<ActionState> {
   const user = await requireUser();
   const artifactId = z.string().uuid().parse(form.get("artifact_id"));
-  const decision = z.enum(["approved", "rejected", "revision_requested"]).parse(form.get("decision"));
+  const decision = z.enum(["approved", "rejected", "revision_requested", "concept_approved"]).parse(form.get("decision"));
   const rationale = String(form.get("rationale") ?? "").slice(0, 4000);
   try {
-    await asUser(db(), user.id, (tx) => tx`select office.decide(${artifactId}, ${decision}, ${rationale})`);
+    await asUser(db(), user.id, (tx) => decision === "concept_approved"
+      ? tx`select office.approve_concept(${artifactId},${rationale})`
+      : tx`select office.decide(${artifactId}, ${decision}, ${rationale})`);
   } catch (e) {
     return { error: friendly(e) };
   }
@@ -197,5 +202,16 @@ export async function revokeExecutorAction(form: FormData): Promise<void> {
   const user = await requireUser();
   const id = String(form.get("executor_id") ?? "");
   await asUser(db(), user.id, (tx) => tx`select office.revoke_executor(${id}::uuid)`);
+  revalidatePath("/w", "layout");
+}
+
+/** Owner attests capabilities with evidence; this endpoint is not offered through MCP. */
+export async function configureExecutorAction(form: FormData): Promise<void> {
+  const user = await requireUser();
+  const seats = String(form.get("seats") ?? "").split(",").map(s=>s.trim()).filter(Boolean);
+  const capabilities = JSON.parse(String(form.get("capabilities") ?? "{}"));
+  await asUser(db(),user.id,tx => tx`select office.configure_executor(
+    ${String(form.get("executor_id"))}::uuid, ${String(form.get("label"))},
+    ${seats}::text[], ${tx.json(capabilities)}, ${String(form.get("mode"))})`);
   revalidatePath("/w", "layout");
 }

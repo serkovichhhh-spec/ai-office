@@ -115,6 +115,7 @@ describe("declarative playbook engine", () => {
 
   it("stub generator satisfies every registered output schema", () => {
     for (const [name, schema] of Object.entries(OUTPUT_SCHEMAS)) {
+      if (["KnowledgeCandidates", "ChallengeReport", "BriefDiagnosis", "WorkPlan"].includes(name)) continue; // semantic contracts have dedicated fixtures in intelligence.test.ts
       if (hasContract(name)) continue; // library contracts (Ajv) are covered in library.test.ts
       const js = z.toJSONSchema(schema, { target: "draft-7" });
       expect(() => schema.parse(stubFromJsonSchema(js as never, name)), name).not.toThrow();
