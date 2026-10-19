@@ -1,0 +1,315 @@
+[
+  {
+    "name": "BriefDiagnosis",
+    "case": "valid",
+    "expected": true,
+    "got": true,
+    "errors": []
+  },
+  {
+    "name": "BriefDiagnosis",
+    "case": "invalid: status=ready але є питання власнику",
+    "expected": false,
+    "got": false,
+    "errors": [
+      "/questions_to_owner must NOT have more than 0 items",
+      "/ must match \"then\" schema",
+      "/status must be equal to constant"
+    ]
+  },
+  {
+    "name": "BriefDiagnosis",
+    "case": "invalid: тема війни — статус має бути needs_owner_input",
+    "expected": false,
+    "got": false,
+    "errors": [
+      "/status must be equal to constant",
+      "/ must match \"then\" schema"
+    ]
+  },
+  {
+    "name": "BriefDiagnosis",
+    "case": "invalid: 6 питань власнику (максимум 5)",
+    "expected": false,
+    "got": false,
+    "errors": [
+      "/questions_to_owner must NOT have more than 5 items"
+    ]
+  },
+  {
+    "name": "BriefDiagnosis",
+    "case": "invalid: факт без джерела у what_we_know",
+    "expected": false,
+    "got": false,
+    "errors": [
+      "/what_we_know/0 must have required property 'source'"
+    ]
+  },
+  {
+    "name": "BriefDiagnosis",
+    "case": "invalid: невідомий плейбук (неправильний формат ключа)",
+    "expected": false,
+    "got": false,
+    "errors": [
+      "/recommended_playbooks/0/playbook must match pattern \"^[a-z][a-z0-9_]{2,40}@[0-9]{1,3}$\""
+    ]
+  },
+  {
+    "name": "WorkPlan",
+    "case": "valid",
+    "expected": true,
+    "got": true,
+    "errors": []
+  },
+  {
+    "name": "WorkPlan",
+    "case": "invalid: light, але 3 workstreams",
+    "expected": false,
+    "got": false,
+    "errors": [
+      "/workstreams must NOT have more than 2 items",
+      "/ must match \"then\" schema"
+    ]
+  },
+  {
+    "name": "WorkPlan",
+    "case": "invalid: paid без budget_usd",
+    "expected": false,
+    "got": false,
+    "errors": [
+      "/workstreams/0 must have required property 'budget_usd'",
+      "/workstreams/0 must match \"then\" schema"
+    ]
+  },
+  {
+    "name": "WorkPlan",
+    "case": "invalid: довільний крок замість плейбука з реєстру",
+    "expected": false,
+    "got": false,
+    "errors": [
+      "/workstreams/0/playbook must match pattern \"^[a-z][a-z0-9_]{2,40}@[0-9]{1,3}$\""
+    ]
+  },
+  {
+    "name": "KnowledgeCandidate",
+    "case": "valid",
+    "expected": true,
+    "got": true,
+    "errors": []
+  },
+  {
+    "name": "KnowledgeCandidate",
+    "case": "invalid: verified без джерел",
+    "expected": false,
+    "got": false,
+    "errors": [
+      "/candidates/0/sources must NOT have fewer than 1 items",
+      "/candidates/0 must match \"then\" schema"
+    ]
+  },
+  {
+    "name": "KnowledgeCandidate",
+    "case": "invalid: assumption без питання власнику",
+    "expected": false,
+    "got": false,
+    "errors": [
+      "/candidates/0 must have required property 'owner_question'",
+      "/candidates/0 must match \"then\" schema"
+    ]
+  },
+  {
+    "name": "KnowledgeCandidate",
+    "case": "invalid: personal заборонено в Hub",
+    "expected": false,
+    "got": false,
+    "errors": [
+      "/candidates/0 boolean schema is false",
+      "/candidates/0 must match \"then\" schema"
+    ]
+  },
+  {
+    "name": "FactReport",
+    "case": "valid",
+    "expected": true,
+    "got": true,
+    "errors": []
+  },
+  {
+    "name": "FactReport",
+    "case": "invalid: verified без evidence",
+    "expected": false,
+    "got": false,
+    "errors": [
+      "/claims/0/evidence must NOT have fewer than 1 items",
+      "/claims/0 must match \"then\" schema"
+    ]
+  },
+  {
+    "name": "FactReport",
+    "case": "invalid: verdict pass, але є blocking",
+    "expected": false,
+    "got": false,
+    "errors": [
+      "/blocking_claims must NOT have more than 0 items",
+      "/ must match \"then\" schema"
+    ]
+  },
+  {
+    "name": "FactReport",
+    "case": "invalid: unverified без умови релізу",
+    "expected": false,
+    "got": false,
+    "errors": [
+      "/claims/0 must have required property 'condition_for_release'",
+      "/claims/0 must match \"then\" schema"
+    ]
+  },
+  {
+    "name": "ChallengeReport",
+    "case": "valid",
+    "expected": true,
+    "got": true,
+    "errors": []
+  },
+  {
+    "name": "ChallengeReport",
+    "case": "invalid: rethink без сильнішої альтернативи",
+    "expected": false,
+    "got": false,
+    "errors": [
+      "/stronger_alternative must be object",
+      "/ must match \"then\" schema"
+    ]
+  },
+  {
+    "name": "ChallengeReport",
+    "case": "invalid: не всі тести (немає brand_fit)",
+    "expected": false,
+    "got": false,
+    "errors": [
+      "/concepts/0/tests must have required property 'brand_fit'"
+    ]
+  },
+  {
+    "name": "ChallengeReport",
+    "case": "invalid: середній бал замість вердикту",
+    "expected": false,
+    "got": false,
+    "errors": [
+      "/concepts/0/verdict must be equal to one of the allowed values"
+    ]
+  },
+  {
+    "name": "DecisionMemo",
+    "case": "valid",
+    "expected": true,
+    "got": true,
+    "errors": []
+  },
+  {
+    "name": "DecisionMemo",
+    "case": "invalid: лише один варіант",
+    "expected": false,
+    "got": false,
+    "errors": [
+      "/options must NOT have fewer than 2 items"
+    ]
+  },
+  {
+    "name": "DecisionMemo",
+    "case": "invalid: немає дій для власника",
+    "expected": false,
+    "got": false,
+    "errors": [
+      "/owner_actions must NOT have fewer than 1 items"
+    ]
+  },
+  {
+    "name": "BrainstormSession",
+    "case": "valid",
+    "expected": true,
+    "got": true,
+    "errors": []
+  },
+  {
+    "name": "BrainstormSession",
+    "case": "invalid: перша фаза не independent",
+    "expected": false,
+    "got": false,
+    "errors": [
+      "/phases/0 must be equal to constant"
+    ]
+  },
+  {
+    "name": "BrainstormSession",
+    "case": "invalid: один учасник",
+    "expected": false,
+    "got": false,
+    "errors": [
+      "/participants must NOT have fewer than 2 items"
+    ]
+  },
+  {
+    "name": "BrainstormSession",
+    "case": "invalid: забагато раундів",
+    "expected": false,
+    "got": false,
+    "errors": [
+      "/max_rounds must be <= 4"
+    ]
+  },
+  {
+    "name": "BrainstormTurn",
+    "case": "valid",
+    "expected": true,
+    "got": true,
+    "errors": []
+  },
+  {
+    "name": "BrainstormTurn",
+    "case": "invalid: у незалежному раунді є посилання на чужі відповіді",
+    "expected": false,
+    "got": false,
+    "errors": [
+      "/responds_to must NOT have more than 0 items",
+      "/ must match \"then\" schema"
+    ]
+  },
+  {
+    "name": "BrainstormTurn",
+    "case": "invalid: rebuttal без контраргументів",
+    "expected": false,
+    "got": false,
+    "errors": [
+      "/counterarguments must NOT have fewer than 1 items",
+      "/ must match \"then\" schema"
+    ]
+  },
+  {
+    "name": "BrainstormDecision",
+    "case": "valid",
+    "expected": true,
+    "got": true,
+    "errors": []
+  },
+  {
+    "name": "BrainstormDecision",
+    "case": "invalid: majority без збереженої розбіжності",
+    "expected": false,
+    "got": false,
+    "errors": [
+      "/dissent must NOT have fewer than 1 items",
+      "/ must match \"then\" schema"
+    ]
+  },
+  {
+    "name": "BrainstormDecision",
+    "case": "invalid: split, але рішення власника не потрібне",
+    "expected": false,
+    "got": false,
+    "errors": [
+      "/owner_decision_needed must be equal to constant",
+      "/ must match \"then\" schema"
+    ]
+  }
+]

@@ -1,0 +1,239 @@
+{
+  "BriefDiagnosis": {
+    "valid": {
+      "schema_version": "BriefDiagnosis.v1",
+      "brief_id": "5419f16a-d941-40cb-9881-98a83d6a0bb6",
+      "status": "needs_owner_input",
+      "real_task": "Не «зробити білборд», а забрати в конкурентів мешканців Позняків, які взимку шукають провайдера, що працює без світла, і привести їх на перевірку покриття до піку сезону блекаутів.",
+      "symptom_vs_cause": "Симптом: запит на білборд. Причина: у сезон блекаутів люди подають заявки всім провайдерам одразу, і вирішує той, хто першим переконає, що його інтернет працює без світла.",
+      "business_objective": {
+        "statement": "Збільшити кількість заявок на перевірку покриття з Позняків у листопаді–грудні.",
+        "kpi": [
+          { "metric": "Заявки з короткого посилання білборда", "target": "задає власник", "measured_by": "l.pavutyna.com/s/<код> — події та ліди в pvlinks" }
+        ]
+      },
+      "audience_tension": "Люди хочуть провайдера, який не зникне з першим відключенням, але не вірять обіцянкам «працює без світла», бо так кажуть усі.",
+      "segments": [
+        { "name": "Сім'ї з дітьми в новобудовах", "situation": "Працюють і вчаться з дому", "barrier": "Не вірять, що інтернет без світла реальний", "trigger": "Перший тривалий блекаут сезону" }
+      ],
+      "competitive_frame": "Київстар і Ланет кажуть «працює без світла» й порівнюються годинами автономності; ціновий удар Ланет — гігабіт за 33–35 грн.",
+      "what_we_know": [
+        { "statement": "Мережа ПАВУТИНИ працює без світла: ДБЖ на LiFePo4, генератори на вузлах; роутер абонент живить сам.", "source": { "record_id": "kd-blackout", "version": "a1b2c3", "pointer": "/body" } }
+      ],
+      "what_we_dont_know": [
+        { "gap": "Скільки годин автономності на Позняках", "impact": "high", "resolve_by": "owner" },
+        { "gap": "Чи дозволено тему війни на білборді", "impact": "high", "resolve_by": "owner" }
+      ],
+      "questions_to_owner": [
+        { "id": "Q1", "question": "Яка підтверджена автономність мережі на Позняках у годинах?", "why_it_matters": "Без цифри головний заголовок не пройде Fact Gate і буде лише умовним.", "options": ["Є цифра", "Немає — працюємо без цифр"] },
+        { "id": "Q2", "question": "Чи можна згадувати удари по енергосистемі на білборді?", "why_it_matters": "Від цього залежить напрям двох із трьох концепцій." }
+      ],
+      "constraints": ["Лого лише оригінальним файлом", "Цифри — лише з підтверджених джерел"],
+      "sensitive_topics": ["war", "price_claim"],
+      "recommended_depth": "standard",
+      "recommended_playbooks": [
+        { "playbook": "research_brief@1", "why": "Зібрати факти автономності й офери конкурентів по району." },
+        { "playbook": "outdoor_print_pack@2", "why": "Концепції, Challenge, макет і друкарський PDF." }
+      ],
+      "data_class": "internal"
+    },
+    "invalid": [
+      { "why": "status=ready але є питання власнику", "patch": { "status": "ready" } },
+      { "why": "тема війни — статус має бути needs_owner_input", "patch": { "status": "needs_research" } },
+      { "why": "6 питань власнику (максимум 5)", "patch": { "questions_to_owner": [
+        { "id": "Q1", "question": "Питання номер один?", "why_it_matters": "Пояснення важливе." },
+        { "id": "Q2", "question": "Питання номер два?", "why_it_matters": "Пояснення важливе." },
+        { "id": "Q3", "question": "Питання номер три?", "why_it_matters": "Пояснення важливе." },
+        { "id": "Q4", "question": "Питання номер чотири?", "why_it_matters": "Пояснення важливе." },
+        { "id": "Q5", "question": "Питання номер п'ять?", "why_it_matters": "Пояснення важливе." },
+        { "id": "Q5", "question": "Питання номер шість?", "why_it_matters": "Пояснення важливе." }
+      ] } },
+      { "why": "факт без джерела у what_we_know", "patch": { "what_we_know": [ { "statement": "Ми найшвидші в Києві" } ] } },
+      { "why": "невідомий плейбук (неправильний формат ключа)", "patch": { "recommended_playbooks": [ { "playbook": "billboard", "why": "Просто зробити білборд." } ] } }
+    ]
+  },
+
+  "WorkPlan": {
+    "valid": {
+      "schema_version": "WorkPlan.v1",
+      "diagnosis": { "artifact_id": "11111111-2222-4333-8444-555555555555", "version": 1 },
+      "objective": "Заявки на перевірку покриття з Позняків до піку сезону блекаутів.",
+      "strategy_summary": "Не сперечатися годинами автономності, а показати живий доказ: освітлені вікна ПАВУТИНИ в темному районі.",
+      "depth": "standard",
+      "workstreams": [
+        { "id": "ws1", "playbook": "research_brief@1", "purpose": "Підтвердити автономність і зібрати офери конкурентів у районі.", "brief_fields": { "research_mode": "candidate_collection" }, "depends_on": [], "cost_class": "subscription" },
+        { "id": "ws2", "playbook": "outdoor_print_pack@2", "purpose": "Три концепції, Challenge, макет 6×3 і друкарський PDF.", "brief_fields": { "medium": "billboard" }, "depends_on": ["ws1"], "cost_class": "subscription" }
+      ],
+      "owner_gates": [
+        { "after": "plan", "question": "Погоджуєте план із двох робіт?" },
+        { "after": "ws2", "question": "Яку з трьох концепцій верстаємо?", "options": ["A", "B", "C"] }
+      ],
+      "success_criteria": ["Жодного непідтвердженого твердження у фіналі", "Друкарський PDF проходить Technical QA"],
+      "risks": ["Немає підтвердженої цифри автономності"],
+      "estimated_owner_minutes": 15,
+      "data_class": "internal"
+    },
+    "invalid": [
+      { "why": "light, але 3 workstreams", "patch": { "depth": "light", "workstreams": [
+        { "id": "ws1", "playbook": "research_brief@1", "purpose": "Перший потік роботи.", "brief_fields": {}, "depends_on": [], "cost_class": "subscription" },
+        { "id": "ws2", "playbook": "outdoor_print_pack@2", "purpose": "Другий потік роботи.", "brief_fields": {}, "depends_on": [], "cost_class": "subscription" },
+        { "id": "ws3", "playbook": "social_content_pack@2", "purpose": "Третій потік роботи.", "brief_fields": {}, "depends_on": [], "cost_class": "subscription" }
+      ] } },
+      { "why": "paid без budget_usd", "patch": { "workstreams": [ { "id": "ws1", "playbook": "reels_concepts@2", "purpose": "Відео через fal.ai.", "brief_fields": {}, "depends_on": [], "cost_class": "paid" } ] } },
+      { "why": "довільний крок замість плейбука з реєстру", "patch": { "workstreams": [ { "id": "ws1", "playbook": "do anything", "purpose": "Зроби все, що треба.", "brief_fields": {}, "depends_on": [], "cost_class": "subscription" } ] } }
+    ]
+  },
+
+  "KnowledgeCandidate": {
+    "valid": {
+      "schema_version": "KnowledgeCandidate.v1",
+      "candidates": [
+        { "kind": "market", "title": "Ланет: гігабіт за 33–35 грн на 12 місяців", "claim": "Ланет пропонує гігабіт за 33–35 грн/міс на 12 місяців (сайт, жовтень 2026).", "confidence": "reported", "sources": [ { "url": "https://lanet.ua/internet", "title": "Ланет — Інтернет", "accessed_at": "2026-10-19" } ], "valid_until": "2026-12-31", "why_it_matters": "Ціновий удар у районі — не змагатися ціною, а доказом надійності.", "data_class": "public" },
+        { "kind": "fact", "title": "Автономність мережі на Позняках", "claim": "Мережа на Позняках працює без світла не менше N годин.", "confidence": "assumption", "sources": [], "why_it_matters": "Головний заголовок білборда спирається на цю цифру.", "owner_question": "Яка підтверджена автономність на Позняках у годинах і з якого джерела?", "data_class": "internal" }
+      ]
+    },
+    "invalid": [
+      { "why": "verified без джерел", "patch": { "candidates": [ { "kind": "fact", "title": "Ми найкращі", "claim": "Ми найкращий провайдер Києва.", "confidence": "verified", "sources": [], "why_it_matters": "Для заголовка білборда.", "data_class": "public" } ] } },
+      { "why": "assumption без питання власнику", "patch": { "candidates": [ { "kind": "fact", "title": "Автономність", "claim": "Автономність 100+ годин.", "confidence": "assumption", "sources": [], "why_it_matters": "Для заголовка білборда.", "data_class": "internal" } ] } },
+      { "why": "personal заборонено в Hub", "patch": { "candidates": [ { "kind": "result", "title": "Лід з Позняків", "claim": "Абонент Іван з телефоном 0501234567 залишив заявку.", "confidence": "verified", "sources": [ { "url": "https://l.pavutyna.com/admin", "title": "Ліди", "accessed_at": "2026-10-19" } ], "why_it_matters": "Результат кампанії.", "data_class": "personal" } ] } }
+    ]
+  },
+
+  "FactReport": {
+    "valid": {
+      "schema_version": "FactReport.v1",
+      "subject": { "artifact_id": "22222222-3333-4444-8555-666666666666", "version": 2 },
+      "claims": [
+        { "claim_id": "C1", "text": "СВІТЛА НЕМАЄ. ПАВУТИНА Є.", "location": "/concepts/0/headline", "claim_type": "promise", "status": "verified", "evidence": [ { "record_id": "kd-blackout", "version": "a1b2c3", "pointer": "/body" } ], "note": "З виноскою про живлення роутера." },
+        { "claim_id": "C2", "text": "100+ годин без світла", "location": "/concepts/1/subline", "claim_type": "statistic", "status": "unverified", "evidence": [], "condition_for_release": "Підтвердити цифру документом або сторінкою сайту з точним формулюванням." },
+        { "claim_id": "C3", "text": "Сусіди проситимуть пароль від Wi-Fi", "location": "/concepts/2/headline", "claim_type": "creative_hyperbole", "status": "not_a_claim", "evidence": [] }
+      ],
+      "blocking_claims": ["C2"],
+      "verdict": "conditional"
+    },
+    "invalid": [
+      { "why": "verified без evidence", "patch": { "claims": [ { "claim_id": "C1", "text": "Найшвидший інтернет", "location": "/h", "claim_type": "comparison", "status": "verified", "evidence": [] } ], "blocking_claims": [], "verdict": "pass" } },
+      { "why": "verdict pass, але є blocking", "patch": { "verdict": "pass" } },
+      { "why": "unverified без умови релізу", "patch": { "claims": [ { "claim_id": "C2", "text": "100+ годин", "location": "/s", "claim_type": "statistic", "status": "unverified", "evidence": [] } ] } }
+    ]
+  },
+
+  "ChallengeReport": {
+    "valid": {
+      "schema_version": "ChallengeReport.v1",
+      "subject": { "artifact_id": "22222222-3333-4444-8555-666666666666", "version": 2 },
+      "concepts": [
+        {
+          "concept_id": "A",
+          "tests": {
+            "swap": { "pass": true, "note": "Логотип конкурента сюди не підставиш: доказ — освітлені вікна саме нашої мережі." },
+            "three_second": { "pass": true, "note": "Чотири слова, контраст темного й світлого." },
+            "banality": { "pass": false, "note": "Формула «X немає. Y є.» уже траплялася в категорії." },
+            "proof": { "pass": true, "note": "Підкріплено фактом про ДБЖ і генератори." },
+            "talkability": { "pass": true, "note": "Фото білборда в блекаут зберуть шери." },
+            "brand_fit": { "pass": true, "note": "Нічна сцена та неон — у стилі бренду." }
+          },
+          "verdict": "workable",
+          "one_line_reason": "Сильний доказ, але формула заголовка знайома.",
+          "improve": ["Додати локальний маркер: «ПОЗНЯКИ НА ЗВ'ЯЗКУ»", "Візуально показати світло у вікнах як доказ"]
+        }
+      ],
+      "stronger_alternative": null,
+      "recommendation": "proceed",
+      "blind_ranking": ["A"]
+    },
+    "invalid": [
+      { "why": "rethink без сильнішої альтернативи", "patch": { "recommendation": "rethink" } },
+      { "why": "не всі тести (немає brand_fit)", "patch": { "concepts": [ { "concept_id": "A", "tests": { "swap": { "pass": true, "note": "Норм." }, "three_second": { "pass": true, "note": "Норм." }, "banality": { "pass": true, "note": "Норм." }, "proof": { "pass": true, "note": "Норм." }, "talkability": { "pass": true, "note": "Норм." } }, "verdict": "strong", "one_line_reason": "Все чудово, нічого не міняти.", "improve": ["Нічого не міняти, все добре."] } ] } },
+      { "why": "середній бал замість вердикту", "patch": { "concepts": [ { "concept_id": "A", "tests": { "swap": { "pass": true, "note": "Норм." }, "three_second": { "pass": true, "note": "Норм." }, "banality": { "pass": true, "note": "Норм." }, "proof": { "pass": true, "note": "Норм." }, "talkability": { "pass": true, "note": "Норм." }, "brand_fit": { "pass": true, "note": "Норм." } }, "verdict": 4.2, "one_line_reason": "Середній бал 4.2 з 5.", "improve": ["Підтягнути заголовок."] } ] } }
+    ]
+  },
+
+  "DecisionMemo": {
+    "valid": {
+      "schema_version": "DecisionMemo.v1",
+      "title": "Білборд Позняки: яку концепцію верстаємо",
+      "decision_needed": "Обрати одну з концепцій для верстки та друку.",
+      "context": "Три концепції пройшли Challenge; концепція B умовна — потрібна підтверджена цифра автономності. Ланет атакує ціною, Київстар — годинами.",
+      "options": [
+        { "id": "O1", "title": "A — «СВІТЛА НЕМАЄ. ПАВУТИНА Є.»", "description": "Доказ через освітлені вікна, без цифр.", "pros": ["Можна друкувати вже зараз"], "cons": ["Знайома формула"], "risk": "low", "evidence": [ { "record_id": "kd-blackout", "version": "a1b2c3", "pointer": "/body" } ] },
+        { "id": "O2", "title": "B — з цифрою автономності", "description": "Сильніше порівняння з конкурентами, але потрібна цифра.", "pros": ["Перемагає в порівнянні годин"], "cons": ["Заблоковано до підтвердження факту"], "risk": "medium", "evidence": [] }
+      ],
+      "recommendation": { "option_id": "O1", "rationale": "Не залежить від непідтвердженого факту і встигає до сезону; B лишаємо умовною на наступну хвилю." },
+      "owner_actions": ["Обрати O1 або O2", "Надати контакт власника площини"],
+      "deadline": "2026-10-25",
+      "reversible": true,
+      "data_class": "internal"
+    },
+    "invalid": [
+      { "why": "лише один варіант", "patch": { "options": [ { "id": "O1", "title": "Єдиний варіант", "description": "Іншого немає зовсім.", "pros": ["Просто"], "cons": ["Немає вибору"], "risk": "low", "evidence": [] } ] } },
+      { "why": "немає дій для власника", "patch": { "owner_actions": [] } }
+    ]
+  },
+
+  "BrainstormSession": {
+    "valid": {
+      "schema_version": "BrainstormSession.v1",
+      "session_id": "33333333-4444-4555-8666-777777777777",
+      "topic": "Як ПАВУТИНІ виграти сезон блекаутів 2026–2027",
+      "brief": "Знайти головну ідею зимової кампанії: конкуренти кажуть «працює без світла», ми теж. Що зробить нас помітними й переконливими?",
+      "participants": [
+        { "label": "gpt_creative", "role": "proposer" },
+        { "label": "claude_main", "role": "proposer" },
+        { "label": "grok_main", "role": "critic" },
+        { "label": "gpt_cmo", "role": "synthesizer" }
+      ],
+      "max_rounds": 2,
+      "phases": ["independent", "rebuttal", "fact_check", "synthesis"],
+      "status": "open",
+      "data_class": "internal"
+    },
+    "invalid": [
+      { "why": "перша фаза не independent", "patch": { "phases": ["rebuttal", "synthesis"] } },
+      { "why": "один учасник", "patch": { "participants": [ { "label": "gpt_cmo", "role": "proposer" } ] } },
+      { "why": "забагато раундів", "patch": { "max_rounds": 9 } }
+    ]
+  },
+
+  "BrainstormTurn": {
+    "valid": {
+      "schema_version": "BrainstormTurn.v1",
+      "session_id": "33333333-4444-4555-8666-777777777777",
+      "round": 1,
+      "phase": "independent",
+      "participant": "claude_main",
+      "position": {
+        "summary": "Не обіцяти — показувати: живі освітлені вікна абонентів як медіа.",
+        "arguments": [ { "id": "A1", "text": "У категорії всі обіцяють; доказ у реальному часі неможливо скопіювати конкуренту." } ]
+      },
+      "responds_to": [],
+      "counterarguments": [],
+      "alternatives": ["Лічильник «годин на зв'язку» на сайті під час блекаутів"],
+      "claims_needing_check": ["Скільки абонентів працює під час останнього блекауту"],
+      "confidence": "medium"
+    },
+    "invalid": [
+      { "why": "у незалежному раунді є посилання на чужі відповіді", "patch": { "responds_to": ["turn-gpt_creative-1"] } },
+      { "why": "rebuttal без контраргументів", "patch": { "phase": "rebuttal", "counterarguments": [] } }
+    ]
+  },
+
+  "BrainstormDecision": {
+    "valid": {
+      "schema_version": "BrainstormDecision.v1",
+      "session_id": "33333333-4444-4555-8666-777777777777",
+      "recommendation": "Головна ідея — «живий доказ»: світло у вікнах і лічильник годин на зв'язку замість обіцянок.",
+      "rationale": "Обидва автори незалежно прийшли до доказовості; критик показав, що цифри годин — поле конкурентів.",
+      "consensus": "majority",
+      "dissent": [ { "participant": "grok_main", "position": "Сильніше працює гумор, ніж доказ.", "why": "Доказові кампанії в категорії вже є; гумор вирізнить швидше." } ],
+      "facts_checked": [ { "claim": "Мережа працює без світла", "status": "verified", "evidence": [ { "record_id": "kd-blackout", "version": "a1b2c3", "pointer": "/body" } ] } ],
+      "open_questions": ["Чи дадуть абоненти дозвіл на фото вікон?"],
+      "owner_decision_needed": true,
+      "rounds_used": 2
+    },
+    "invalid": [
+      { "why": "majority без збереженої розбіжності", "patch": { "dissent": [] } },
+      { "why": "split, але рішення власника не потрібне", "patch": { "consensus": "split", "owner_decision_needed": false } }
+    ]
+  }
+}
