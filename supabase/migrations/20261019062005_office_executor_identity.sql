@@ -135,7 +135,7 @@ $$;
 create or replace function office.gateway_eligible(e office.executors,s office.steps) returns boolean
 language sql stable set search_path = '' as $$
   select s.status = 'awaiting_agent' and s.workspace_id=e.workspace_id
-    and (s.input->>'routing_policy'='capabilities' or coalesce(s.executor,'claude_session')=e.kind)
+    and (coalesce(s.input->>'routing_policy'='capabilities',false) or coalesce(s.executor,'claude_session')=e.kind)
     and (e.allowed_seats is null or s.agent_role=any(e.allowed_seats))
     and not exists (select 1 from unnest(s.requires) c where
       nullif(e.capabilities->c->>'verified_at','') is null or nullif(trim(e.capabilities->c->>'evidence'),'') is null)
@@ -158,7 +158,7 @@ begin
     select * into s from office.steps where id = p_step for update;
     if not found or s.workspace_id <> e.workspace_id then raise exception 'task not found' using errcode = 'P0002'; end if;
     if not office.executor_independent(e,s) then raise exception 'not_independent' using errcode='42501'; end if;
-    if not office.gateway_eligible(e, s) then
+    if office.gateway_eligible(e, s) is not true then
       return jsonb_build_object('claimed', false, 'reason', 'not_assigned_to_you_or_not_waiting');
     end if;
     if exists (select 1 from office.execution_attempts x where x.step_id = s.id and x.state = 'claimed') then
@@ -211,7 +211,7 @@ begin
       where t.token_hash = p_token_hash and t.kind = 'access' and t.revoked_at is null and t.expires_at > now()));
   if not found then raise exception 'invalid executor token' using errcode = '28000'; end if;
   update office.executors set last_seen_at = now() where id = e.id;
-  return jsonb_build_object('executor_id', e.id, 'label',e.label,'mode',e.mode,'capabilities',e.capabilities, 'kind', e.kind, 'name', e.name, 'ops', to_jsonb(e.allowed_ops));
+  return jsonb_build_object('workspace_slug',(select slug from office.workspaces where id=e.workspace_id),'executor_id', e.id, 'label',e.label,'mode',e.mode,'capabilities',e.capabilities, 'kind', e.kind, 'name', e.name, 'ops', to_jsonb(e.allowed_ops));
 end $$;
 
 create or replace function office.worker_complete(p_step uuid, p_worker text, p_attempt int, p_result jsonb)

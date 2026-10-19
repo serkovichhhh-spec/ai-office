@@ -4,7 +4,7 @@ import { AuthError, handleMcpBody, hashToken, SERVER_INFO } from "@/lib/mcp/serv
 import { CORS, originOf, wwwAuthenticate } from "@/lib/mcp/oauth";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 30;
+export const maxDuration = 60;
 
 function unauthorized(req: Request, error?: string) {
   return NextResponse.json(

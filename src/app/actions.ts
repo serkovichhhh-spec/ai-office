@@ -48,6 +48,7 @@ export async function submitBriefAction(_prev: ActionState, form: FormData): Pro
   const catalog = catalogForWorkspace(String(workspace.slug));
   const pb = catalog.find((p) => p.key === String(form.get("playbook_key") ?? "") && p.version === Number(form.get("playbook_version") ?? 0))
     ?? catalog.find((p) => p.key === String(form.get("playbook_key") ?? ""));
+  if (pb?.key === "program" && !v.deadline) return {error:"Для плану CMO вкажіть дедлайн, щоб розподілити роботу в часі"};
   if (!pb) return { error: "Невідомий тип задачі" };
   if (v.deliverable_count > pb.maxCount) return { error: `Для цього типу задачі — не більше ${pb.maxCount} результатів` };
   const fields: Record<string, string | number | string[]> = {};
@@ -214,4 +215,114 @@ export async function configureExecutorAction(form: FormData): Promise<void> {
     ${String(form.get("executor_id"))}::uuid, ${String(form.get("label"))},
     ${seats}::text[], ${tx.json(capabilities)}, ${String(form.get("mode"))})`);
   revalidatePath("/w", "layout");
+}
+
+/** Phone fallback: bounded direct upload, with owner authorization checked before Storage. */
+export async function uploadRunFileAction(_previous:ActionState,form:FormData):Promise<ActionState>{
+  const user=await requireUser();
+  const id=z.string().uuid().parse(form.get("run_id"));
+  const purpose=String(form.get("purpose")??"").trim().slice(0,500);
+  const file=form.get("file");
+  if(!(file instanceof File)||!purpose)return {error:"Оберіть файл і вкажіть його призначення"};
+  if(file.size>4*1024*1024)return {error:"З телефона можна завантажити до 4 МБ. Більший файл передайте з чату."};
+  try{
+    const [run]=await asUser(db(),user.id,tx=>tx`select r.id,r.workspace_id,w.slug from office.runs r join office.workspaces w on w.id=r.workspace_id
+      where r.id=${id}::uuid and office.has_role(r.workspace_id,array['owner'])`);
+    if(!run)return {error:"Недостатньо прав"};
+    const {filesEnabledForWorkspace}=await import("@/lib/orchestrator/rollout");
+    if(!filesEnabledForWorkspace(String(run.slug)))return {error:"Передачу файлів для цього офісу ще не ввімкнено"};
+    const {inspectFile,safeFileName}=await import("@/lib/mcp/files");
+    const {fileStore}=await import("@/lib/mcp/file-store");
+    const bytes=new Uint8Array(await file.arrayBuffer());const meta=inspectFile(bytes);
+    await fileStore().put(`${run.workspace_id}/${run.id}/${meta.sha256}.${meta.extension}`,bytes,meta.mime_type);
+    await asUser(db(),user.id,tx=>tx`select office.owner_attach_file(${id}::uuid,${tx.json({...meta,original_name:safeFileName(file.name),purpose})})`);
+    revalidatePath("/w","layout");return {ok:true};
+  }catch(e){
+    const code=(e as {code?:string}).code;
+    if(code==='unsupported_type')return {error:"Потрібен справжній PNG, JPEG, WebP або PDF"};
+    if(code==='files_not_configured')return {error:"Сховище файлів ще не налаштовано"};
+    return {error:friendly(e)};
+  }
+}
+
+export async function setAutomationAction(form:FormData):Promise<void>{
+ const user=await requireUser();const ws=z.string().uuid().parse(form.get("workspace_id"));
+ await asUser(db(),user.id,tx=>tx`select office.set_automation(${ws}::uuid,${form.get("enabled")==="true"})`);
+ revalidatePath("/w","layout");
+}
+/** Owner-only manual sandbox invocation; cron has a separate default-off gate. */
+export async function dispatchAgentAction(form:FormData):Promise<void>{
+ const user=await requireUser();const id=z.string().uuid().parse(form.get("workspace_id"));
+ const [ws]=await asUser(db(),user.id,tx=>tx`select slug from office.workspaces where id=${id}::uuid and office.has_role(id,array['owner'])`);
+ if(!ws)throw new Error("Недостатньо прав");
+ const {dispatchTriggers}=await import("@/lib/orchestrator/triggers");
+ await dispatchTriggers(db(),{workspace:String(ws.slug),maxDispatch:1,timeBudgetMs:15_000});
+ revalidatePath("/w","layout");
+}
+export async function configureTriggerChannelAction(form:FormData):Promise<void>{
+ const user=await requireUser();const f=(key:string)=>String(form.get(key)??"");
+ const ws=z.string().uuid().parse(f("workspace_id"));const executor=z.string().uuid().parse(f("executor_id"));
+ const limits={max_runs_per_day:Number(f("max_runs_per_day")),max_concurrent:Number(f("max_concurrent")),max_credits_per_month:Number(f("max_credits_per_month")),est_credits_per_run:Number(f("est_credits_per_run")),price_evidence:f("price_evidence").slice(0,1000)};
+ const seats=f("seats").split(",").map(s=>s.trim()).filter(Boolean);
+ await asUser(db(),user.id,tx=>tx`select office.configure_trigger_channel(${ws}::uuid,${executor}::uuid,${f("channel_ref")},${f("secret_ref")},${seats}::text[],${tx.json(limits)},${form.get("enabled")==="on"})`);
+ revalidatePath("/w","layout");
+}
+export async function pauseTriggerChannelAction(form:FormData):Promise<void>{
+ const user=await requireUser();const id=z.string().uuid().parse(form.get("channel_id"));
+ await asUser(db(),user.id,tx=>tx`select office.pause_trigger_channel(${id}::uuid)`);revalidatePath("/w","layout");
+}
+
+export async function startProgramAction(_previous:ActionState,form:FormData):Promise<ActionState>{
+ const user=await requireUser();
+ try{
+  const artifact=z.string().uuid().parse(form.get("plan_artifact_id"));const budget=z.coerce.number().finite().positive().parse(form.get("budget_usd"));
+  const cap=z.coerce.number().int().min(1).max(50).parse(form.get("max_triggers"));
+  const [a]=await asUser(db(),user.id,tx=>tx`select a.content,a.step_id,w.slug from office.artifacts a join office.workspaces w on w.id=a.workspace_id
+   where a.id=${artifact}::uuid and a.kind='work_plan' and office.has_role(w.id,array['owner'])`);
+  if(!a)return {error:"План не знайдено або недостатньо прав"};
+  const {programEngineEnabledForWorkspace}=await import("@/lib/orchestrator/rollout");
+  if(!programEngineEnabledForWorkspace(String(a.slug)))return {error:"Запуск програм для цього офісу ще не ввімкнено"};
+  const {WorkPlanSchema,workPlanErrors}=await import("@/lib/orchestrator/work-plan");
+  const {PLAYBOOKS}=await import("@/lib/orchestrator/registry");
+  const {_provider,...raw}=a.content as Record<string,unknown>;void _provider;
+  const plan=WorkPlanSchema.parse(raw);
+  if(!a.step_id)return {error:"План не має підтвердженого походження з робочого кроку"};
+  const [{ctx}]=await db()`select office.worker_context(${a.step_id}::uuid) as ctx`;
+  const context=ctx as import("@/lib/orchestrator/types").StepContext;
+  const {evidenceErrors}=await import("@/lib/orchestrator/marketing-brief");
+  const errors=[...workPlanErrors(plan,PLAYBOOKS,new Set(context.knowledge.flatMap(k=>k.id?[k.id]:[]))),...evidenceErrors(plan,context)];
+  if(errors.length)return {error:errors.slice(0,3).join("; ")};
+  await asUser(db(),user.id,tx=>tx`select office.start_program(${artifact}::uuid,${budget},${cap})`);
+  revalidatePath("/w","layout");kickWorker();return {ok:true};
+ }catch(e){return {error:friendly(e)};}
+}
+export async function approveProgramGateAction(form:FormData):Promise<void>{
+ const user=await requireUser();const id=z.string().uuid().parse(form.get("program_id"));
+ const after=z.string().regex(/^ws[0-9]+$/).parse(form.get("after"));const note=String(form.get("note")??"").slice(0,4000);
+ await asUser(db(),user.id,tx=>tx`select office.approve_program_gate(${id}::uuid,${after},${note})`);revalidatePath("/w","layout");kickWorker();
+}
+export async function cancelProgramAction(form:FormData):Promise<void>{
+ const user=await requireUser();const id=z.string().uuid().parse(form.get("program_id"));
+ await asUser(db(),user.id,tx=>tx`select office.cancel_program(${id}::uuid)`);revalidatePath("/w","layout");
+}
+export async function setProgramEngineAction(form:FormData):Promise<void>{
+ const user=await requireUser();const ws=z.string().uuid().parse(form.get("workspace_id"));
+ await asUser(db(),user.id,tx=>tx`select office.set_program_engine(${ws}::uuid,${form.get("enabled")==="true"})`);revalidatePath("/w","layout");
+}
+
+export async function createSandboxAction(form:FormData):Promise<void>{
+ const user=await requireUser();const ws=z.string().uuid().parse(form.get("workspace_id"));
+ await asUser(db(),user.id,tx=>tx`select office.create_sandbox(${ws}::uuid)`);revalidatePath("/w","layout");redirect("/w/sandbox");
+}
+
+export async function startFileSpikeAction(form:FormData):Promise<void>{
+ const user=await requireUser();const ws=z.string().uuid().parse(form.get("workspace_id"));
+ const {filesEnabledForWorkspace}=await import("@/lib/orchestrator/rollout");
+ if(!filesEnabledForWorkspace("sandbox"))throw new Error("files disabled");
+ const run=await asUser(db(),user.id,async tx=>{
+  const [w]=await tx`select id from office.workspaces where id=${ws}::uuid and slug='sandbox' and office.has_role(id,array['owner'])`;
+  if(!w)throw new Error("not allowed");
+  const [{id:b}]=await tx`select office.create_brief(${ws}::uuid,${tx.json({title:"Тест передачі PNG/PDF",objective:"Перевірити F1/F2 файлової передачі у sandbox, без виробничого запуску",playbook_key:"file_spike",playbook_version:1,deliverable_count:1})}) as id`;
+  const [{id:r}]=await tx`select office.submit_brief(${b}::uuid,${"file-spike:"+randomUUID()}) as id`;return String(r);
+ });kickWorker();redirect(`/w/sandbox/runs/${run}`);
 }

@@ -64,6 +64,7 @@ export interface StepContext {
   agent: AgentRow | null;
   knowledge: KnowledgeItem[];
   artifacts: ArtifactItem[];
+  upstream_artifacts?: {source_run_id:string;workstream:string;id:string;version:number;content:unknown}[];
 }
 
 export interface NextStep {

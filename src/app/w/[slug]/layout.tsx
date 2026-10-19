@@ -1,3 +1,4 @@
+import { planV1Enabled } from "@/lib/orchestrator/rollout";
 import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/supabase";
 import { listWorkspaces } from "@/lib/queries";
@@ -26,7 +27,7 @@ export default async function WorkspaceLayout({ children, params }: { children: 
         ) : (
           <span className="muted">{ws.name}</span>
         )}
-        <NavLinks slug={ws.slug} />
+        <NavLinks slug={ws.slug} advanced={ws.role === "owner" && planV1Enabled(ws.slug)} />
         <span className="spacer" />
         <span className="muted small who">{user.email}</span>
         <form action={signOutAction}><button className="btn link">Вийти</button></form>

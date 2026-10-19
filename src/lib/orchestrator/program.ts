@@ -1,13 +1,14 @@
 import {z} from 'zod';
 import type {Playbook} from './registry';
 import {PLAYBOOKS} from './registry';
-import {WorkPlanSchema,workPlanErrors} from './work-plan';
+import {WorkPlanSchema,workPlanErrors,PROGRAM_BRIEF_CONTRACTS} from './work-plan';
 import {BriefDiagnosisSchema} from './intelligence-contracts';
 import {briefText,composeSystem,dataBlock,knowledgeText,feedbackParts} from './prompting';
 import {codeStep,latestArtifact} from './util';
 import {diagnoseBrief} from './research';
+import {evidenceErrors} from './marketing-brief';
 import {V1_SKILL_PINS} from './skills';
-import briefSchemas from './library/brief-schemas.json';
+
 export const program:Playbook={
  key:'program',version:1,title:'План робіт CMO (shadow)',roles:['orchestrator'],
  catalog:{key:'program',version:1,title:'План робіт CMO (shadow)',label:'План робіт CMO (shadow)',description:'Планує роботу за зареєстрованими процесами; сам нічого не запускає',priority:'P2',group:'Планування',maxCount:6,fields:[]},
@@ -17,12 +18,12 @@ export const program:Playbook={
   if(k==='intake'||k==='revision_intake')return {...codeStep({output:{shadow_mode:true},next:[{step_key:'diagnosis',agent_role:'orchestrator',executor:'chatgpt',input:ctx.step.input}],activity:'planning',message:'Планування без автоматичного запуску робіт'}),skill_pins:V1_SKILL_PINS};
   if(k==='diagnosis')return diagnoseBrief(ctx,ai,'work_plan');
   if(k==='work_plan'){
-   const schema=WorkPlanSchema.superRefine((v,c)=>{for(const m of workPlanErrors(v,PLAYBOOKS))c.addIssue({code:'custom',message:m});});
+   const schema=WorkPlanSchema.superRefine((v,c)=>{for(const m of [...workPlanErrors(v,PLAYBOOKS,new Set(ctx.knowledge.flatMap(k=>k.id?[k.id]:[]))),...evidenceErrors(v,ctx)])c.addIssue({code:'custom',message:m});});
    const r=await ai.generate({schemaName:'WorkPlan',schema,jsonSchema:z.toJSONSchema(WorkPlanSchema,{target:'draft-7'}) as Record<string,unknown>,tier:'strong',
     system:composeSystem(ctx.agent?.system_prompt,'Ти - CMO. Склади скінченний план лише з відомих плейбуків. Цей крок не запускає виконавців.','orchestrator'),
     user:[dataBlock('brief',briefText(ctx.brief)),dataBlock('knowledge',knowledgeText(ctx.knowledge)),
      dataBlock('artifact',JSON.stringify(latestArtifact(ctx,'diagnosis')?.content)),dataBlock('feedback',feedbackParts(ctx.step.input).join('\n')),
-     `Дозволені плейбуки і brief contracts:\n${JSON.stringify(Object.fromEntries(Object.values(PLAYBOOKS).filter(p=>p.catalog && p.key in briefSchemas.$defs).map(p=>[`${p.key}@${p.version}`,briefSchemas.$defs[p.key as keyof typeof briefSchemas.$defs]])))}`,
+     `Дозволені плейбуки і brief contracts:\n${JSON.stringify(Object.fromEntries(Object.values(PLAYBOOKS).filter(p=>p.catalog && !p.catalog.hidden && p.key in PROGRAM_BRIEF_CONTRACTS).map(p=>[`${p.key}@${p.version}`,PROGRAM_BRIEF_CONTRACTS[p.key as keyof typeof PROGRAM_BRIEF_CONTRACTS]])))}`,
      'inputs містить повний плоский бриф дочірнього плейбука, включно з конкретним deadline. depends_on - DAG; light <=2, standard <=4, deep <=6. program@* заборонений. owner_gates явно вказують рішення власника. Якщо даних не вистачає, збережи open_questions; не вигадуй факти або ідентифікатори знань.'
     ].join('\n\n'),
     // Deliberately invalid placeholder: a stub must never impersonate a reviewed executable plan.

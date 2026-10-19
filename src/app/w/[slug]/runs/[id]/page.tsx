@@ -1,3 +1,9 @@
+import { ProgramStart } from "./ProgramStart";
+import { planV1Enabled,programEngineEnabledForWorkspace } from "@/lib/orchestrator/rollout";
+import { approveProgramGateAction,cancelProgramAction } from "../../../../actions";
+import { FileUpload } from "./FileUpload";
+import { filesEnabledForWorkspace } from "@/lib/orchestrator/rollout";
+import { asUser,db } from "@/lib/db";
 import { Fragment } from "react";
 import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/supabase";
@@ -71,6 +77,15 @@ export default async function RunPage({ params }: { params: Promise<{ slug: stri
   const spec = pb?.catalog;
   const kTitles = new Map((spec?.fields.some((f) => f.type.startsWith("knowledge")) ? await listKnowledge(user.id, ws.id) : []).map((k) => [k.id, k.title]));
   const showField = (v: unknown): string => (Array.isArray(v) ? v.map(showField).join(", ") : kTitles.get(String(v)) ?? ENUM_LABEL[String(v)] ?? String(v));
+  const filesEnabled=filesEnabledForWorkspace(ws.slug);
+  const files=filesEnabled?await asUser(db(),user.id,tx=>tx`select id,original_name,purpose,mime_type,byte_size,width,height from office.artifact_files where run_id=${d.run.id}::uuid order by created_at`):[];
+  const workPlan=d.artifacts.filter(a=>a.kind==="work_plan").at(-1);
+  const programFeature=planV1Enabled(ws.slug);
+  const programs=programFeature?await asUser(db(),user.id,tx=>tx`select p.*,coalesce((select sum(cost_usd) from office.runs where program_id=p.id),0) as spent
+    from office.programs p where p.parent_run_id=${d.run.id}::uuid or p.id=(select program_id from office.runs where id=${d.run.id}::uuid) order by p.approved_at desc limit 1`):[];
+  const programInfo=programs[0];
+  const programChildren=programInfo?await asUser(db(),user.id,tx=>tx`select i.item_key,i.run_id,i.depends_on,b.title,r.status from office.program_items i join office.runs r on r.id=i.run_id join office.briefs b on b.id=r.brief_id where i.program_id=${programInfo.id}::uuid order by i.item_key`):[];
+  const programGates=programInfo?await asUser(db(),user.id,tx=>tx`select after_item,question,approved_at from office.program_gates where program_id=${programInfo.id}::uuid order by after_item`):[];
   const pkgV1 = latest && (latest.content as { schema_version?: string }).schema_version === "Package.v1" ? (latest.content as unknown as PackageV1) : null;
   const specDraft = !latest && pb?.stepTitles && d.brief.playbook_key !== "reels_concepts" || (!latest && (d.run.playbook_version ?? 1) > 1)
     ? Object.entries(pb?.stepTitles ?? {}).map(([key, title]) => ({ s: { key, title }, a: d.artifacts.filter((a) => a.kind === key).at(-1) })).filter((x) => x.a).at(-1)
@@ -130,6 +145,27 @@ export default async function RunPage({ params }: { params: Promise<{ slug: stri
             </div>
           )}
 
+          {programFeature&&(workPlan||programInfo)&&<section className="panel" aria-labelledby="program-title">
+            <h2 id="program-title">План і програма робіт</h2>
+            {programInfo&&<><p>Стан: {String(programInfo.status)}{programInfo.blocked_reason?` · ${programInfo.blocked_reason}`:""} · витрати {String(programInfo.spent)} з {String(programInfo.budget_usd)} USD</p>
+              <ul>{programChildren.map(c=><li key={String(c.run_id)}><a href={`/w/${ws.slug}/runs/${c.run_id}`}>{String(c.item_key)}: {String(c.title)}</a> · {String(c.status)}{(c.depends_on as string[]).length?` · після ${(c.depends_on as string[]).join(", ")}`:""}</li>)}</ul>
+              {programGates.map(g=><div key={String(g.after_item)} style={{marginTop:12}}><b>{String(g.after_item)}: {String(g.question)}</b><p>{g.approved_at?"Схвалено":"Чекає рішення власника після затвердження результату"}</p>
+                {!g.approved_at&&ws.role==="owner"&&programInfo.status==="active"&&<form action={approveProgramGateAction}><input type="hidden" name="program_id" value={String(programInfo.id)}/><input type="hidden" name="after" value={String(g.after_item)}/><input name="note" placeholder="Коментар до рішення" maxLength={4000}/><button className="btn secondary">Погодити перехід далі</button></form>}
+              </div>)}
+              {ws.role==="owner"&&["active","blocked"].includes(String(programInfo.status))&&<form action={cancelProgramAction} style={{marginTop:12}}><input type="hidden" name="program_id" value={String(programInfo.id)}/><button className="btn danger">Скасувати програму та всі дочірні задачі</button></form>}
+            </>}
+            {workPlan&&ws.role==="owner"&&d.run.status==="needs_approval"&&(!programInfo||(!["active","blocked"].includes(String(programInfo.status))&&programInfo.plan_artifact_id!==workPlan.id))&&
+              (programEngineEnabledForWorkspace(ws.slug)?<ProgramStart artifactId={workPlan.id} budget={String(d.run.budget_usd)}/>:<p className="notice">План збережено для оцінки. Виконання програм для цього офісу ще не ввімкнено.</p>)}
+          </section>}
+          {filesEnabled && <section className="panel" aria-labelledby="files-title">
+            <h2 id="files-title">Файли задачі</h2>
+            {files.map(f=><div key={String(f.id)} style={{marginBottom:12}}>
+              <a href={`/api/files/${f.id}`} target="_blank" rel="noreferrer">{String(f.original_name)}</a>
+              <p className="small muted">{String(f.purpose)} · {Math.ceil(Number(f.byte_size)/1024)} КБ{f.width?` · ${f.width} × ${f.height}`:""}</p>
+              {String(f.mime_type).startsWith("image/")&&<img src={`/api/files/${f.id}`} alt={String(f.purpose)} style={{maxWidth:"100%",maxHeight:300,objectFit:"contain"}}/>}
+            </div>)}
+            {ws.role==="owner"&&<FileUpload runId={d.run.id}/>}
+          </section>}
           <section className="panel" aria-labelledby="deliv-title">
             <div className="panel-head">
               <h2 id="deliv-title">{latest ? `Пакет v${latest.version}` : "Результат"}</h2>

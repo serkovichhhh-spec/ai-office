@@ -1,6 +1,7 @@
 import { randomUUID, timingSafeEqual } from "node:crypto";
 import { db } from "@/lib/db";
 import { providerFromEnv } from "@/lib/ai";
+import { dispatchTriggers } from "@/lib/orchestrator/triggers";
 import { tick } from "@/lib/orchestrator/worker";
 
 export const runtime = "nodejs";
@@ -26,5 +27,6 @@ export async function GET(req: Request) {
     maxSteps: 20,
     log: (msg, extra) => console.log(JSON.stringify({ msg, workerId, ...extra })),
   });
-  return Response.json({ workerId, ...report });
+  const triggers=await dispatchTriggers(db(),{cron:true});
+  return Response.json({ workerId, ...report, triggers });
 }

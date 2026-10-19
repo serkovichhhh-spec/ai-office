@@ -36,3 +36,7 @@ create table if not exists cmo.agent_runs (
   summary text,
   details jsonb default '{}'::jsonb
 );
+
+-- Storage bucket catalogue only. Object bytes are exercised through an injected test store.
+create schema if not exists storage;
+create table if not exists storage.buckets(id text primary key,name text not null,public boolean default false,file_size_limit bigint,allowed_mime_types text[]);

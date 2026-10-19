@@ -1,3 +1,5 @@
+import { db } from "@/lib/db";
+import { createSandboxAction,startFileSpikeAction,setAutomationAction } from "../../actions";
 import { randomUUID } from "node:crypto";
 import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/supabase";
@@ -25,6 +27,8 @@ export default async function OfficePage({ params }: { params: Promise<{ slug: s
   if (!ws) notFound();
   const [floor, runs, handoffs, execs, knowledge] = await Promise.all([floorState(user.id, ws), listRuns(user.id, ws.id), listHandoffs(user.id, ws.id), executors(user.id, ws.id), listKnowledge(user.id, ws.id)]);
 
+  const sandboxAvailable=ws.role==="owner"&&ws.slug!=="sandbox"?Boolean((await db()`select to_regprocedure('office.create_sandbox(uuid)') is not null as ready`)[0].ready):false;
+  const automationAvailable=ws.role==="owner"?Boolean((await db()`select to_regprocedure('office.set_automation(uuid,boolean)') is not null as ready`)[0].ready):false;
   const active = runs.some((r) => r.status === "queued" || r.status === "running");
   const waiting = runs.filter((r) => r.status === "needs_approval");
   const canBrief = ws.role !== "viewer";
@@ -33,6 +37,9 @@ export default async function OfficePage({ params }: { params: Promise<{ slug: s
   return (
     <>
       <LiveRefresh active={active} />
+      {automationAvailable&&<form action={setAutomationAction}><input type="hidden" name="workspace_id" value={ws.id}/><input type="hidden" name="enabled" value="false"/><button className="btn danger">Зупинити автоматизацію</button></form>}
+      {ws.slug==="sandbox"&&ws.role==="owner"&&<section className="panel"><h2>Тест файлового каналу</h2><form action={startFileSpikeAction}><input type="hidden" name="workspace_id" value={ws.id}/><button className="btn secondary">Створити тест передачі файла</button></form></section>}
+      {sandboxAvailable&&<section className="panel"><h2>Тестовий офіс</h2><p className="small">Окремий простір для перевірки нових процесів. Бізнес-дані та задачі не копіюються.</p><form action={createSandboxAction}><input type="hidden" name="workspace_id" value={ws.id}/><button className="btn secondary">Відкрити або створити sandbox</button></form></section>}
       {(floor.waitingByExecutor.claude_session ?? 0) > 0 && (
         <p className="notice" style={{ marginBottom: 8 }} role="status">
           {floor.waitingByExecutor.claude_session === 1 ? "1 крок чекає" : `${floor.waitingByExecutor.claude_session} кроки чекають`} на Claude.
