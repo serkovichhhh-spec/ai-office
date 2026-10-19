@@ -1,6 +1,6 @@
 import type { AiProvider } from "@/lib/ai/types";
 import { ReviewSchema, ScriptsSchema, StrategySchema, type Review, type Scripts, type Strategy } from "../schemas";
-import { briefText, composeSystem, dataBlock, knowledgeText } from "../prompting";
+import { briefText, carryOwner, composeSystem, dataBlock, feedbackParts, knowledgeText, ownerBlock } from "../prompting";
 import type { StepContext, StepResult } from "../types";
 import { latestArtifact, codeStep } from "../util";
 
@@ -126,7 +126,7 @@ async function scripts(ctx: StepContext, ai: AiProvider): Promise<StepResult> {
   const b = ctx.brief;
   const strat = latestArtifact<Strategy>(ctx, "strategy");
   if (!strat) throw new Error("scripts: strategy artifact missing");
-  const feedback = [ctx.step.input.owner_feedback, ctx.step.input.reviewer_feedback].filter(Boolean).map(String);
+  const feedback = feedbackParts(ctx.step.input);
   const prev = latestArtifact<Scripts>(ctx, "scripts");
   const res = await ai.generate({
     schemaName: "scripts",
@@ -166,7 +166,7 @@ async function scripts(ctx: StepContext, ai: AiProvider): Promise<StepResult> {
   return aiStep(res, {
     artifact: { kind: "scripts", title: `Сценарії (${res.output.scripts.length})` },
     // Carry the review-loop counter so the reviewer knows how many send-backs already happened.
-    next: [{ step_key: "review", agent_role: "reviewer", input: { review_loop: Number(ctx.step.input.review_loop ?? 0) }, depends_on: ["scripts"] }],
+    next: [{ step_key: "review", agent_role: "reviewer", input: { review_loop: Number(ctx.step.input.review_loop ?? 0), ...carryOwner(ctx.step.input) }, depends_on: ["scripts"] }],
     activity: "drafting",
     message: feedback.length ? "Сценарії доопрацьовано за коментарями" : `Сценаріїв: ${res.output.scripts.length}`,
   });
@@ -187,6 +187,7 @@ async function review(ctx: StepContext, ai: AiProvider): Promise<StepResult> {
       dataBlock("brief", briefText(b)),
       dataBlock("artifact", JSON.stringify(scr.content)),
       dataBlock("knowledge", knowledgeText(ctx.knowledge)),
+      ownerBlock(ctx.step.input),
     ].join("\n\n"),
     stub: () => ({
       verdict: "pass" as const,
@@ -204,7 +205,7 @@ async function review(ctx: StepContext, ai: AiProvider): Promise<StepResult> {
         {
           step_key: "scripts",
           agent_role: "copywriter",
-          input: { reviewer_feedback: formatIssues(res.output), review_loop: loopsSoFar + 1 },
+          input: { reviewer_feedback: formatIssues(res.output), review_loop: loopsSoFar + 1, ...carryOwner(ctx.step.input) },
           depends_on: ["review"],
         },
       ]

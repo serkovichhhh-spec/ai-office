@@ -17,7 +17,7 @@ import { bundle, contract, type SemanticCheck } from "./contracts";
 import briefSchemas from "./library/brief-schemas.json";
 import libraryDefs from "./library/playbooks.json";
 import registry from "./library/registry.json";
-import { briefText, composeSystem, dataBlock, knowledgeText } from "./prompting";
+import { briefText, carryOwner, composeSystem, dataBlock, feedbackParts, knowledgeText, ownerBlock } from "./prompting";
 import type { Playbook } from "./registry";
 import { stubFromJsonSchema } from "./stubgen";
 import type { StepContext, StepResult } from "./types";
@@ -177,7 +177,7 @@ function libraryPlaybook(def: LibDef): Playbook {
 
   async function authorStep(ctx: StepContext, ai: AiProvider, s: LibStep): Promise<StepResult> {
     const loop = Number(ctx.step.input.review_loop ?? 0);
-    const feedback = [ctx.step.input.owner_feedback, ctx.step.input.reviewer_feedback].filter(Boolean).map(String);
+    const feedback = feedbackParts(ctx.step.input);
     const prev = feedback.length ? latestArtifact<unknown>(ctx, s.key) : null;
     const name = defName(s);
     const missing = (ctx.step.input.missing_inputs as string[] | undefined) ?? [];
@@ -215,8 +215,8 @@ function libraryPlaybook(def: LibDef): Playbook {
       const i = order.indexOf(s.key);
       const nk = order[i + 1];
       next = nk
-        ? [{ step_key: nk, agent_role: byKey.get(nk)!.seat, executor: byKey.get(nk)!.executor, input: { review_loop: loop }, depends_on: [s.key] }]
-        : [{ step_key: "review", agent_role: def.review.seat, executor: def.review.executor, input: { review_loop: loop }, depends_on: [s.key] }];
+        ? [{ step_key: nk, agent_role: byKey.get(nk)!.seat, executor: byKey.get(nk)!.executor, input: { review_loop: loop, ...carryOwner(ctx.step.input) }, depends_on: [s.key] }]
+        : [{ step_key: "review", agent_role: def.review.seat, executor: def.review.executor, input: { review_loop: loop, ...carryOwner(ctx.step.input) }, depends_on: [s.key] }];
     }
     const count = Array.isArray(out[reg.main_output]) ? (out[reg.main_output] as unknown[]).length : null;
     return {
@@ -266,6 +266,7 @@ function libraryPlaybook(def: LibDef): Playbook {
         }),
         prevReview ? dataBlock("artifact", `review v${prevReview.version}:\n${JSON.stringify(prevReview.content)}`) : "",
         dataBlock("knowledge", knowledgeText(ctx.knowledge)),
+        ownerBlock(ctx.step.input),
       ].filter(Boolean).join("\n\n"),
       stub: () => ({
         decision: "pass",
@@ -288,7 +289,7 @@ function libraryPlaybook(def: LibDef): Playbook {
       message = "Рев'юер ескалював власнику — без нових знань чи рішення не виправити";
     } else if (loop < MAX_REVISIONS) {
       const s = byKey.get(reviewTarget)!;
-      next = [{ step_key: s.key, agent_role: s.seat, executor: s.executor, input: { reviewer_feedback: formatIssues(r), review_loop: loop + 1 }, depends_on: ["review"] }];
+      next = [{ step_key: s.key, agent_role: s.seat, executor: s.executor, input: { reviewer_feedback: formatIssues(r), review_loop: loop + 1, ...carryOwner(ctx.step.input) }, depends_on: ["review"] }];
       message = `Рев'юер повернув на доопрацювання (зауважень: ${arr(r.issues).filter((i) => i.resolution === "open").length})`;
     } else {
       next = toPackage("escalated", "review");

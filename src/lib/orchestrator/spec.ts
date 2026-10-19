@@ -12,7 +12,7 @@
  */
 import { z } from "zod";
 import type { AiProvider, ModelTier } from "@/lib/ai/types";
-import { briefText, composeSystem, dataBlock, knowledgeText } from "./prompting";
+import { briefText, carryOwner, composeSystem, dataBlock, feedbackParts, knowledgeText, ownerBlock } from "./prompting";
 import { stubFromJsonSchema } from "./stubgen";
 import type { StepContext, StepResult } from "./types";
 import { codeStep, latestArtifact } from "./util";
@@ -155,16 +155,16 @@ export function playbookFromSpec(spec: PlaybookSpec, opts: { version?: number; h
   const stepByKey = new Map(spec.steps.map((s) => [s.key, s]));
 
   /** Next hop after `key`, carrying the review-loop counter forward. */
-  const after = (key: string, loop: number): StepResult["next_steps"] => {
+  const after = (key: string, loop: number, carry: Record<string, unknown> = {}): StepResult["next_steps"] => {
     const i = order.indexOf(key);
     const nextKey = order[i + 1];
-    if (nextKey) return [{ step_key: nextKey, agent_role: stepByKey.get(nextKey)!.seat, input: { review_loop: loop }, depends_on: [key] }];
-    return [{ step_key: "review", agent_role: spec.review.seat, input: { review_loop: loop }, depends_on: [key] }];
+    if (nextKey) return [{ step_key: nextKey, agent_role: stepByKey.get(nextKey)!.seat, input: { review_loop: loop, ...carry }, depends_on: [key] }];
+    return [{ step_key: "review", agent_role: spec.review.seat, input: { review_loop: loop, ...carry }, depends_on: [key] }];
   };
 
   async function runStep(ctx: StepContext, ai: AiProvider, s: StepSpec): Promise<StepResult> {
     const loop = Number(ctx.step.input.review_loop ?? 0);
-    const feedback = [ctx.step.input.owner_feedback, ctx.step.input.reviewer_feedback].filter(Boolean).map(String);
+    const feedback = feedbackParts(ctx.step.input);
     const prev = feedback.length ? latestArtifact<unknown>(ctx, s.key) : null;
     const res = await ai.generate({
       schemaName: s.schemaName,
@@ -189,7 +189,7 @@ export function playbookFromSpec(spec: PlaybookSpec, opts: { version?: number; h
     return aiResult(
       res,
       { kind: s.key, title: s.title },
-      after(s.key, loop),
+      after(s.key, loop, carryOwner(ctx.step.input)),
       s.activity ?? "drafting",
       feedback.length ? `${s.title}: доопрацьовано за коментарями` : s.summary(res.output),
     );
@@ -209,6 +209,7 @@ export function playbookFromSpec(spec: PlaybookSpec, opts: { version?: number; h
         dataBlock("brief", briefText(ctx.brief)),
         ...inputsBlock(ctx, order),
         dataBlock("knowledge", knowledgeText(ctx.knowledge)),
+        ownerBlock(ctx.step.input),
         "Кожна проблема: target = ключ кроку, fragment = точна цитата, criterion = порушений критерій, fix = конкретне виправлення.",
         "verdict = revise, лише якщо є проблема high або критерій оцінено нижче 3. Не відкривай нових побажань, якщо це повторне рев'ю: перевір, чи усунуто попередні зауваження.",
         "У unsupported_claims перелічи твердження про ПАВУТИНУ без підтвердження в <knowledge>.",
@@ -224,7 +225,7 @@ export function playbookFromSpec(spec: PlaybookSpec, opts: { version?: number; h
     const sendBack = res.output.verdict === "revise" && loop < MAX_REVIEW_LOOPS;
     const target = spec.review.sendBackTo;
     const next = sendBack
-      ? [{ step_key: target, agent_role: stepByKey.get(target)!.seat, input: { reviewer_feedback: formatIssues(res.output), review_loop: loop + 1 }, depends_on: ["review"] }]
+      ? [{ step_key: target, agent_role: stepByKey.get(target)!.seat, input: { reviewer_feedback: formatIssues(res.output), review_loop: loop + 1, ...carryOwner(ctx.step.input) }, depends_on: ["review"] }]
       : [{ step_key: "package", agent_role: "orchestrator", depends_on: ["review"] }];
     return aiResult(
       res,
