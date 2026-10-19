@@ -3,6 +3,7 @@ import type { z } from "zod";
 export type ModelTier = "fast" | "balanced" | "strong";
 
 export interface GenerateRequest<T> {
+  skills?: import("../orchestrator/skills").SkillPackage[];
   /** Role instructions (system prompt). */
   system: string;
   /** Task text. Untrusted material (brief, knowledge) must already be wrapped in delimited data blocks. */

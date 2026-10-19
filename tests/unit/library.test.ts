@@ -60,14 +60,16 @@ class Reviewer implements AiProvider {
 }
 
 describe("playbook library v1", () => {
-  it("registers 12 playbooks; catalogue offers library reels v2 and outdoor_print_pack, not the old ones", () => {
+  it("preserves 12 v1 library graphs; catalogue offers CMO-first versions", () => {
     expect(LIBRARY_PLAYBOOKS).toHaveLength(12);
     const keys = PLAYBOOK_CATALOG.map((p) => `${p.key}@${p.version}`);
-    expect(keys).toContain("reels_concepts@2");
+    expect(keys).toContain("reels_concepts@3");
+    expect(keys).toContain("outdoor_print_pack@2");
+    expect(keys).not.toContain("reels_concepts@2");
     expect(keys).not.toContain("reels_concepts@1");
     expect(keys).not.toContain("ooh_concepts@1");
     expect(PLAYBOOK_CATALOG.filter((p) => p.priority === "P1").map((p) => p.key).sort()).toEqual(
-      ["graphic_design_pack", "offer_launch", "outdoor_print_pack", "paid_media_campaign", "reels_concepts"]);
+      ["graphic_design_pack", "offer_launch", "outdoor_print_pack", "paid_media_campaign", "reels_concepts", "research_brief"]);
     expect(() => playbookFor("reels_concepts", 1)).not.toThrow(); // old runs keep working
   });
 

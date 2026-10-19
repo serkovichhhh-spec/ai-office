@@ -1,0 +1,4 @@
+interface:
+  display_name: "Творчий Challenge"
+  short_description: "Незалежна перевірка сили творчої ідеї"
+  default_prompt: "Використай $creative-challenge для перевірки концепцій."

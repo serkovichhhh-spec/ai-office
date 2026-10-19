@@ -1,13 +1,16 @@
+import { db } from "@/lib/db";
+import { createSandboxAction,startFileSpikeAction,setAutomationAction } from "../../actions";
 import { randomUUID } from "node:crypto";
 import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/supabase";
 import { EXECUTOR_LABEL, executors, floorState, listHandoffs, listKnowledge, listRuns, workspaceBySlug } from "@/lib/queries";
-import { revokeExecutorAction } from "../../actions";
+import { configureExecutorAction, revokeExecutorAction } from "../../actions";
 import { PixelAvatar } from "../../components/PixelAvatar";
 import { LiveRefresh } from "../../components/LiveRefresh";
 import { ACTIVITY, HANDOFF_STATUS, ProviderBadge, StatusPill, StubBadge, usd, when } from "../../components/ui";
 import { BriefForm } from "./BriefForm";
-import { PLAYBOOK_CATALOG } from "@/lib/orchestrator/registry";
+import { catalogForWorkspace } from "@/lib/orchestrator/registry";
+import { ROLE_CONTRACTS, type RoleKey } from "@/lib/orchestrator/role-contracts";
 
 export const dynamic = "force-dynamic";
 
@@ -24,6 +27,8 @@ export default async function OfficePage({ params }: { params: Promise<{ slug: s
   if (!ws) notFound();
   const [floor, runs, handoffs, execs, knowledge] = await Promise.all([floorState(user.id, ws), listRuns(user.id, ws.id), listHandoffs(user.id, ws.id), executors(user.id, ws.id), listKnowledge(user.id, ws.id)]);
 
+  const sandboxAvailable=ws.role==="owner"&&ws.slug!=="sandbox"?Boolean((await db()`select to_regprocedure('office.create_sandbox(uuid)') is not null as ready`)[0].ready):false;
+  const automationAvailable=ws.role==="owner"?Boolean((await db()`select to_regprocedure('office.set_automation(uuid,boolean)') is not null as ready`)[0].ready):false;
   const active = runs.some((r) => r.status === "queued" || r.status === "running");
   const waiting = runs.filter((r) => r.status === "needs_approval");
   const canBrief = ws.role !== "viewer";
@@ -32,6 +37,9 @@ export default async function OfficePage({ params }: { params: Promise<{ slug: s
   return (
     <>
       <LiveRefresh active={active} />
+      {automationAvailable&&<form action={setAutomationAction}><input type="hidden" name="workspace_id" value={ws.id}/><input type="hidden" name="enabled" value="false"/><button className="btn danger">Зупинити автоматизацію</button></form>}
+      {ws.slug==="sandbox"&&ws.role==="owner"&&<section className="panel"><h2>Тест файлового каналу</h2><form action={startFileSpikeAction}><input type="hidden" name="workspace_id" value={ws.id}/><button className="btn secondary">Створити тест передачі файла</button></form></section>}
+      {sandboxAvailable&&<section className="panel"><h2>Тестовий офіс</h2><p className="small">Окремий простір для перевірки нових процесів. Бізнес-дані та задачі не копіюються.</p><form action={createSandboxAction}><input type="hidden" name="workspace_id" value={ws.id}/><button className="btn secondary">Відкрити або створити sandbox</button></form></section>}
       {(floor.waitingByExecutor.claude_session ?? 0) > 0 && (
         <p className="notice" style={{ marginBottom: 8 }} role="status">
           {floor.waitingByExecutor.claude_session === 1 ? "1 крок чекає" : `${floor.waitingByExecutor.claude_session} кроки чекають`} на Claude.
@@ -59,7 +67,7 @@ export default async function OfficePage({ params }: { params: Promise<{ slug: s
             <div key={dept} className={`room room-${dept}`}>
               <h3 className="room-title">
                 {dept === "marketing" ? "Marketing HQ" : "Production Studio"}
-                <span className="muted small"> · {dept === "marketing" ? "працюють онлайн" : "локальний /produce, підключиться через міст"}</span>
+                <span className="muted small"> · {dept === "marketing" ? "стратегія, дослідження й комунікації" : "дизайн і підготовка матеріалів"}</span>
               </h3>
               <div className="desks">
                 {team.map((a) => {
@@ -86,15 +94,31 @@ export default async function OfficePage({ params }: { params: Promise<{ slug: s
         })}
       </section>
 
+      <section className="panel" aria-labelledby="responsibilities-title">
+        <h2 id="responsibilities-title">Обов'язки та відповідальність команди</h2>
+        <p className="muted small">CMO відповідає за бриф і результат запуску. Спеціалісти виконують профільні задачі, QA перевіряє незалежно.</p>
+        {floor.agents.map((a) => {
+          const profile = ROLE_CONTRACTS[a.role_key as RoleKey];
+          if (!profile) return null;
+          const manager = profile.reportsTo === "owner" ? "Власник" : ROLE_CONTRACTS[profile.reportsTo as RoleKey]?.title;
+          return <details key={a.role_key} style={{ marginBottom: 12 }}>
+            <summary>{a.display_name} · керівник: {manager}</summary>
+            <p>{profile.duties}</p>
+            <p><strong>Компетенції:</strong> {profile.skills.join(", ")}.</p>
+            <p><strong>Результат:</strong> {profile.handoff}</p>
+          </details>;
+        })}
+      </section>
+
       <div className="cols">
         <div>
           {canBrief && (
             <section className="panel" aria-labelledby="brief-title">
               <div className="panel-head">
                 <h2 id="brief-title">Новий бриф</h2>
-                <span className="muted small">Сценарій: концепції та сценарії рілсів</span>
+                <span className="muted small">Оберіть процес під вашу задачу</span>
               </div>
-              <BriefForm workspaceId={ws.id} slug={ws.slug} idempotencyKey={`brief-${randomUUID()}`} catalog={PLAYBOOK_CATALOG} knowledge={knowledge.filter((k) => k.status === "approved").map((k) => ({ id: k.id, title: k.title, kind: k.kind }))} />
+              <BriefForm workspaceId={ws.id} slug={ws.slug} idempotencyKey={`brief-${randomUUID()}`} catalog={catalogForWorkspace(ws.slug)} knowledge={knowledge.filter((k) => k.status === "approved").map((k) => ({ id: k.id, title: k.title, kind: k.kind }))} />
             </section>
           )}
           <section className="panel" aria-labelledby="runs-title">
@@ -154,14 +178,25 @@ export default async function OfficePage({ params }: { params: Promise<{ slug: s
                 {execs.map((e) => (
                   <li key={e.id} className="row">
                     <div className="row-main">
-                      <div className="row-title">{e.name} <span className="pill">{EXECUTOR_LABEL[e.kind] ?? e.kind}</span></div>
+                      <div className="row-title">{e.label} · {e.name} <span className="pill">{EXECUTOR_LABEL[e.kind] ?? e.kind}</span></div>
                       <div className="row-meta">{e.last_seen_at ? `Останнє звернення ${when(e.last_seen_at)}` : "Ще не звертався"}</div>
                     </div>
                     {ws.role === "owner" && (
+                      <div>{e.label && <details><summary>Налаштувати ролі та можливості</summary>
+                        <form action={configureExecutorAction} className="form-grid">
+                          <input type="hidden" name="executor_id" value={e.id} />
+                          <label>Ім'я<input name="label" required pattern="[a-z][a-z0-9_]+" maxLength={64} defaultValue={e.label} /></label>
+                          <label>Дозволені ролі через кому<input name="seats" defaultValue={(e.allowed_seats ?? floor.agents.map(a=>a.role_key)).join(", ")} /></label>
+                          <label>Режим<select name="mode" defaultValue={e.mode}><option value="interactive">Сесія</option><option value="triggered">Агент за тригером</option></select></label>
+                          <label>Підтверджені можливості (JSON)<textarea name="capabilities" rows={5} defaultValue={JSON.stringify(e.capabilities,null,2)} /></label>
+                          <p className="muted small">Для перевіреної можливості вкажіть verified_at та evidence з результатом тесту. Порожній список ролей забороняє всі задачі.</p>
+                          <button className="btn">Зберегти</button>
+                        </form>
+                      </details>}
                       <form action={revokeExecutorAction}>
                         <input type="hidden" name="executor_id" value={e.id} />
                         <button className="btn link">Відключити</button>
-                      </form>
+                      </form></div>
                     )}
                   </li>
                 ))}

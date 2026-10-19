@@ -14,12 +14,16 @@
     "test": "vitest run",
     "test:sql": "bash tests/sql/run.sh",
     "test:e2e-local": "tsx scripts/e2e-local.ts",
-    "test:e2e-mcp": "tsx scripts/e2e-mcp.ts"
+    "test:e2e-mcp": "tsx scripts/e2e-mcp.ts",
+    "test:sql:embedded": "node --import tsx scripts/test-sql-embedded.ts",
+    "test:e2e-intelligence": "node --import tsx scripts/e2e-intelligence.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.7",
     "@supabase/supabase-js": "^2.118.0",
     "ajv": "^8.17.1",
+    "image-size": "2.0.2",
+    "ipaddr.js": "2.2.0",
     "next": "^16.4.2",
     "postgres": "^3.4.9",
     "react": "^19.3.1",
@@ -28,6 +32,7 @@
     "zod": "^4.6.7"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "0.5.10",
     "@types/node": "^26.6.5",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",

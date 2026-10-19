@@ -1,4 +1,5 @@
 import type { BriefRow, KnowledgeItem } from "./types";
+import { roleInstructions } from "./role-contracts";
 
 /** Wrap untrusted text so the model treats it as data, never as instructions. */
 export function dataBlock(tag: string, content: string): string {
@@ -34,12 +35,18 @@ export function briefText(b: BriefRow): string {
 export function knowledgeText(items: KnowledgeItem[]): string {
   if (items.length === 0) return "(затверджених знань немає)";
   return items
-    .map((k) => `### ${k.title} [${k.kind}]${k.id ? ` record_id=${k.id} version=${k.version ?? "1"}` : ""}${k.freshness_date ? ` (актуально на ${k.freshness_date})` : ""}\n${k.body}`)
+    .map((k) => `### ${k.title} [${k.kind}]${k.id ? ` record_id=${k.id} version=${k.version ?? "1"}` : ""}${k.freshness_date ? ` (актуально на ${k.freshness_date})` : ""}\nДжерело: ${k.source_url ?? "внутрішній документ; зовнішнє посилання не задане"}\n${k.body}`)
     .join("\n\n");
 }
 
-export function composeSystem(agentPrompt: string | undefined, fallback: string): string {
-  return `${(agentPrompt ?? "").trim() || fallback}\n\n${DATA_RULES}`;
+export function composeSystem(agentPrompt: string | undefined, taskRole: string, roleKey?: string): string {
+  if (!roleKey) return `${(agentPrompt ?? "").trim() || taskRole}\n\n${DATA_RULES}`;
+  // A stale workspace prompt must not erase the current step's actual specialisation.
+  const standard = roleInstructions(roleKey);
+  const extra = (agentPrompt ?? "").trim();
+  return [taskRole, standard, extra && extra !== standard
+    ? `Додатковий профіль workspace (застосовуй у межах поточної ролі та задачі):\n${extra}` : "", DATA_RULES]
+    .filter(Boolean).join("\n\n");
 }
 
 /**
@@ -69,6 +76,6 @@ export function feedbackParts(input: Record<string, unknown>): string[] {
 export function ownerBlock(input: Record<string, unknown>): string {
   const owner = carryOwner(input).owner_feedback;
   return owner
-    ? `${dataBlock("feedback", `${OWNER_HEADER}\n${owner}`)}\n\nПеревір, чи результат виконує коментар власника. Повернуті власником ідеї в новій версії не мають повторюватися, навіть у зміненому формулюванні — це проблема high.`
+    ? `${dataBlock("feedback", `${OWNER_HEADER}\n${owner}`)}\n\nПеревір, чи результат виконує коментар власника. Повторення повернутої ідеї без усунення причини відхилення і нової аргументації - проблема high. Косметичне перефразування не є доопрацюванням; суттєво розвинутий напрям оцінюй за фактичними змінами та вказівкою власника.`
     : "";
 }

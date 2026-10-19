@@ -9,6 +9,8 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import postgres from "postgres";
+import { PGlite } from "@electric-sql/pglite";
+import { embeddedSql } from "../tests/embedded-db";
 import { asUser, createSql } from "../src/lib/db-core";
 import { StubProvider } from "../src/lib/ai/stub";
 import { tick } from "../src/lib/orchestrator/worker";
@@ -26,11 +28,11 @@ function check(name: string, cond: boolean, detail?: unknown) {
 }
 
 async function main() {
-  const admin = postgres(ADMIN_URL, { max: 1 });
-  await admin.unsafe(`create database ${DB}`);
-  await admin.end();
+  const embedded = process.env.E2E_EMBEDDED === "1" ? new PGlite() : null;
+  const admin = embedded ? null : postgres(ADMIN_URL, { max: 1 });
+  if (admin) { await admin.unsafe(`create database ${DB}`); await admin.end(); }
   const dbUrl = ADMIN_URL.replace(/\/[^/]*$/, `/${DB}`);
-  const su = postgres(dbUrl, { max: 1, onnotice: () => {} });
+  const su = embedded ? embeddedSql(embedded) : postgres(dbUrl, { max: 1, onnotice: () => {} });
   try {
     const files = [
       "tests/sql/00_supabase_shim.sql",
@@ -47,7 +49,7 @@ async function main() {
     const u = new URL(dbUrl);
     u.username = "office_app";
     u.password = APP_PASSWORD;
-    const app = createSql(u.toString());
+    const app = embedded ? embeddedSql(embedded,"office_app") : createSql(u.toString());
     const ai = new StubProvider();
 
     // 1. Owner submits a brief (as the authenticated user, through RLS).
@@ -163,9 +165,12 @@ async function main() {
     await app.end();
   } finally {
     await su.end();
-    const admin2 = postgres(ADMIN_URL, { max: 1 });
-    await admin2.unsafe(`drop database if exists ${DB} with (force)`);
-    await admin2.end();
+    if (embedded) await embedded.close();
+    else {
+      const admin2 = postgres(ADMIN_URL, { max: 1 });
+      await admin2.unsafe(`drop database if exists ${DB} with (force)`);
+      await admin2.end();
+    }
   }
 }
 

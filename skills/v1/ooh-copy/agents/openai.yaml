@@ -1,0 +1,4 @@
+interface:
+  display_name: "Текст зовнішньої реклами"
+  short_description: "Стислі повідомлення для зовнішньої реклами"
+  default_prompt: "Використай $ooh-copy для розробки білборда."

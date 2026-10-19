@@ -58,12 +58,13 @@ export interface ArtifactItem {
 /** Shape returned by office.worker_context(step_id). */
 export interface StepContext {
   step: StepRow;
-  run: { id: string; revision: number; playbook_key: string; playbook_version?: number; budget_usd: string | number; cost_usd: string | number };
+  run: { id: string; revision: number; playbook_key: string; playbook_version?: number; budget_usd: string | number; cost_usd: string | number; skill_pins?: import("./skills").SkillPins };
   brief: BriefRow;
   workspace: { id: string; slug: string; name: string };
   agent: AgentRow | null;
   knowledge: KnowledgeItem[];
   artifacts: ArtifactItem[];
+  upstream_artifacts?: {source_run_id:string;workstream:string;id:string;version:number;content:unknown}[];
 }
 
 export interface NextStep {
@@ -73,10 +74,13 @@ export interface NextStep {
   depends_on?: string[];
   /** Executor for this step (claude_session | chatgpt | human); defaults to the seat's configured executor. */
   executor?: string;
+  independent_of_step?: string;
+  requires?: string[];
 }
 
 /** Payload for office.worker_complete. */
 export interface StepResult {
+  skill_pins?: import("./skills").SkillPins;
   output: unknown;
   provider: string;
   model: string | null;

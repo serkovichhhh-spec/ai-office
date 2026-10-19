@@ -9,6 +9,8 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import postgres from "postgres";
+import { PGlite } from "@electric-sql/pglite";
+import { embeddedSql } from "../tests/embedded-db";
 import { asUser, createSql } from "../src/lib/db-core";
 import { SessionProvider } from "../src/lib/ai/session";
 import { StubProvider } from "../src/lib/ai/stub";
@@ -28,11 +30,11 @@ function check(name: string, cond: boolean, detail?: unknown) {
 type Any = Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
 
 async function main() {
-  const admin = postgres(ADMIN_URL, { max: 1 });
-  await admin.unsafe(`create database ${DB}`);
-  await admin.end();
+  const embedded = process.env.E2E_EMBEDDED === "1" ? new PGlite() : null;
+  const admin = embedded ? null : postgres(ADMIN_URL, { max: 1 });
+  if (admin) { await admin.unsafe(`create database ${DB}`); await admin.end(); }
   const dbUrl = ADMIN_URL.replace(/\/[^/]*$/, `/${DB}`);
-  const su = postgres(dbUrl, { max: 1, onnotice: () => {} });
+  const su = embedded ? embeddedSql(embedded) : postgres(dbUrl, { max: 1, onnotice: () => {} });
   try {
     for (const f of ["tests/sql/00_supabase_shim.sql", ...readdirSync(join(ROOT, "supabase/migrations")).sort().map((f) => `supabase/migrations/${f}`)]) {
       await su.unsafe(readFileSync(join(ROOT, f), "utf8"));
@@ -50,7 +52,7 @@ async function main() {
     const u = new URL(dbUrl);
     u.username = "office_app";
     u.password = "e2e-local-only";
-    const app = createSql(u.toString());
+    const app = embedded ? embeddedSql(embedded,"office_app") : createSql(u.toString());
     const gpt = { sql: app, tokenHash: hashToken(gptToken) };
     const claude = { sql: app, tokenHash: hashToken(claudeToken) };
     const other = { sql: app, tokenHash: hashToken(otherToken) };
@@ -170,9 +172,12 @@ async function main() {
     await app.end();
   } finally {
     await su.end();
-    const admin2 = postgres(ADMIN_URL, { max: 1 });
-    await admin2.unsafe(`drop database if exists ${DB} with (force)`);
-    await admin2.end();
+    if (embedded) await embedded.close();
+    else {
+      const admin2 = postgres(ADMIN_URL, { max: 1 });
+      await admin2.unsafe(`drop database if exists ${DB} with (force)`);
+      await admin2.end();
+    }
   }
 }
 

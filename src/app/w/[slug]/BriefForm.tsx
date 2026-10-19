@@ -63,7 +63,7 @@ export function BriefForm({ workspaceId, slug, idempotencyKey, catalog, knowledg
           Скільки результатів
           <input name="deliverable_count" type="number" min={1} max={maxCount} defaultValue={Math.min(3, maxCount)} key={`n-${key}`} />
         </label>
-        <label>Дедлайн<input name="deadline" type="date" /></label>
+        <label>Дедлайн<input name="deadline" type="date" required={pb.key === "program"} /></label>
         <label>
           Пріоритет
           <select name="priority" defaultValue="medium">

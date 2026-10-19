@@ -115,7 +115,7 @@ export function SectionView({ content }: { content: unknown }) {
 
 export interface PackageV1 {
   schema_version: "Package.v1";
-  outcome?: "ready_for_approval" | "blocked" | "escalated";
+  outcome?: "ready_for_approval" | "blocked" | "escalated" | "conditional";
   sections: { kind: string; label: string; version: number; content: unknown }[];
   blocking_questions?: string[];
   review: { verdict: string; summary: string; scores: { criterion: string; score: number; comment: string }[];
@@ -135,6 +135,7 @@ const SKIP_SECTIONS = new Set(["claims_needing_source", "source_uses", "blocking
 export function PackageView({ pkg }: { pkg: PackageV1 }) {
   return (
     <>
+      {pkg.outcome === "conditional" && <p className="notice" style={{marginBottom:12}}><b>Умовна концепція.</b> Ідею можна схвалити окремо. Для передачі в продакшн спочатку підтвердьте факти та пройдіть повторне рев’ю.</p>}
       {pkg.outcome === "blocked" && (
         <div className="notice bad" style={{ marginBottom: 12 }}>
           <b>Заблоковано: бракує підтверджених даних.</b> Затвердити такий пакет не можна. Додайте відповіді в «Знання» і натисніть «Доопрацювати» з коментарем.

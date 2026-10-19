@@ -1,0 +1,16 @@
+{
+  "research_brief": {
+    "type": "object", "additionalProperties": false,
+    "properties": {
+      "title": {"type":"string","minLength":1,"maxLength":200},
+      "objective": {"type":"string","minLength":1,"maxLength":3000},
+      "audience": {"type":"string","minLength":1,"maxLength":2000},
+      "channel": {"type":"string","minLength":1,"maxLength":120},
+      "deliverable_count": {"type":"integer","minimum":1,"maximum":10},
+      "deadline": {"type":"string","format":"date","minLength":10,"maxLength":40},
+      "acceptance_criteria": {"type":"array","items":{"type":"string","minLength":1,"maxLength":1500},"minItems":1,"maxItems":20},
+      "references": {"type":"array","items":{"type":"string","minLength":1,"maxLength":2048},"maxItems":20}
+    },
+    "required":["title","objective","audience","channel","deliverable_count","deadline","acceptance_criteria","references"]
+  }
+}

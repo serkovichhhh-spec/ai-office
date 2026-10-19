@@ -1,0 +1,4 @@
+interface:
+  display_name: "Маркетингове дослідження"
+  short_description: "Перевірка джерел та дослідницьких гіпотез"
+  default_prompt: "Використай $research-method для дослідження брифу."

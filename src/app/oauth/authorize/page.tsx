@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { asUser, db } from "@/lib/db";
 import { currentUser } from "@/lib/supabase";
 import { Logo } from "../../components/ui";
+import { ExecutorChoice } from "./ExecutorChoice";
 import { approveAction, denyAction } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -53,6 +54,11 @@ export default async function AuthorizePage({ searchParams }: { searchParams: Pr
     tx`select w.id, w.name from office.workspaces w where office.has_role(w.id, array['owner']) order by w.name`,
   );
   if (workspaces.length === 0) return <Problem text="Підключати виконавців може лише власник workspace." />;
+  const connected = await asUser(db(),user.id,tx => tx`
+    select id,workspace_id,kind,to_jsonb(e)->>'label' as label from office.executors e
+    where revoked_at is null and office.has_role(workspace_id,array['owner']) order by label`);
+  const [{ready}] = await db()`select exists(select 1 from information_schema.columns where table_schema='office' and table_name='executors' and column_name='label') as ready`;
+  if (!ready) return <Problem text="Оновлення підключень очікує встановлення міграції ідентичності. Чинні підключення працюють." />;
   const guessKind = /claude|anthropic/i.test(client.name) ? "claude_session" : "chatgpt";
   const hidden = ["client_id", "redirect_uri", "code_challenge", "state"] as const;
 
@@ -67,17 +73,7 @@ export default async function AuthorizePage({ searchParams }: { searchParams: Pr
         </p>
         <form action={approveAction} className="form-grid">
           {hidden.map((k) => <input key={k} type="hidden" name={k} value={q[k]} />)}
-          <label>Workspace
-            <select name="workspace_id" defaultValue={String(workspaces[0].id)}>
-              {workspaces.map((w) => <option key={String(w.id)} value={String(w.id)}>{String(w.name)}</option>)}
-            </select>
-          </label>
-          <label>Хто виконує задачі
-            <select name="kind" defaultValue={guessKind}>
-              <option value="chatgpt">ChatGPT</option>
-              <option value="claude_session">Claude</option>
-            </select>
-          </label>
+          <ExecutorChoice workspaces={workspaces.map(w => ({ id:String(w.id), name:String(w.name) }))} executors={connected.map(e => ({ id:String(e.id), workspace_id:String(e.workspace_id), kind:String(e.kind), label:String(e.label) }))} guessKind={guessKind} />
           <p className="muted small">Вхід як {user.email}</p>
           <button className="btn approve">Дозволити</button>
         </form>
