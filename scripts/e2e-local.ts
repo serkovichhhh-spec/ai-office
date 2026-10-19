@@ -137,6 +137,29 @@ async function main() {
     check("session run labelled as Claude session", sr.provider === "session", sr);
     const sArts = await su`select kind, provider, model from office.artifacts where run_id = ${sRun} and kind <> 'deliverable'`;
     check("session artifacts carry claude-session model", sArts.every((a) => a.provider === "session" && a.model === "claude-session"), sArts);
+    // 7. Declarative playbook (ooh_concepts) end to end on the stub provider, then an owner revision.
+    const oRun = await asUser(app, OWNER, async (tx) => {
+      const [{ id: b }] = await tx`select office.create_brief(${ws}, ${tx.json({
+        title: "Білборди для нових районів", objective: "Впізнаваність ПАВУТИНИ в нових районах підключення",
+        deliverable_count: 2, playbook_key: "ooh_concepts", fields: { formats: "6×3 — 8 шт.", tone: "Спокійний, впевнений" },
+      })}) as id`;
+      const [{ id }] = await tx`select office.submit_brief(${b}, 'e2e-ooh-0001') as id`;
+      return id as string;
+    });
+    const oRep = await tick(app, ai, { workerId: "e2e-ooh", maxSteps: 20 });
+    check("ooh: worker ran 6 steps", oRep.succeeded === 6 && oRep.failed === 0, oRep);
+    const oSteps = await su`select step_key from office.steps where run_id = ${oRun} order by created_at`;
+    check("ooh: steps in spec order", oSteps.map((x) => x.step_key).join(">") === "intake>strategy>concepts>design_specs>review>package", oSteps.map((x) => x.step_key));
+    const [oDel] = await su`select id, content from office.artifacts where run_id = ${oRun} and kind = 'deliverable'`;
+    const oPkg = oDel.content as { schema_version: string; sections: { kind: string }[]; brief: { fields: Record<string, string> } };
+    check("ooh: Package.v1 with 3 sections and brief fields", oPkg.schema_version === "Package.v1" && oPkg.sections.length === 3 && oPkg.brief.fields.formats === "6×3 — 8 шт.", oPkg);
+    await asUser(app, OWNER, (tx) => tx`select office.decide(${oDel.id}, 'revision_requested', 'Більше локальності')`);
+    await su`update office.steps set next_attempt_at = now() - interval '1 second' where run_id = ${oRun} and status = 'ready'`;
+    await tick(app, ai, { workerId: "e2e-ooh", maxSteps: 20 });
+    const oSteps2 = await su`select step_key from office.steps where run_id = ${oRun} order by created_at`;
+    check("ooh: revision restarts from concepts", oSteps2.map((x) => x.step_key).slice(6).join(">") === "revision_intake>concepts>design_specs>review>package", oSteps2.map((x) => x.step_key));
+    const [oFinal] = await su`select status, revision from office.runs where id = ${oRun}`;
+    check("ooh: v2 waits for approval", oFinal.status === "needs_approval" && oFinal.revision === 2, oFinal);
     await app.end();
   } finally {
     await su.end();

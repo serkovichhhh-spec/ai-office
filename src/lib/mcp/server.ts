@@ -8,17 +8,11 @@
 import { createHash } from "node:crypto";
 import { z } from "zod";
 import type { Sql } from "../db-core";
-import { ReviewSchema, ScriptsSchema, StrategySchema } from "../orchestrator/schemas";
+import { OUTPUT_SCHEMAS } from "../orchestrator/registry";
 
 export const SUPPORTED_PROTOCOL_VERSIONS = ["2025-11-25", "2025-06-18", "2025-03-26", "2024-11-05"];
 export const SERVER_INFO = { name: "ai-office", title: "AI Office", version: "1.0.0" };
 
-/** Output contracts known to the playbooks; used to give the executor instant feedback. */
-const OUTPUT_SCHEMAS: Record<string, z.ZodType> = {
-  strategy: StrategySchema,
-  scripts: ScriptsSchema,
-  review: ReviewSchema,
-};
 
 export function hashToken(token: string): string {
   return createHash("sha256").update(token, "utf8").digest("hex");
@@ -188,6 +182,7 @@ export async function runTool(ctx: McpContext, name: string, rawArgs: unknown) {
     if (code === "P0002") return toolResult({ error: "not_found" }, true);
     if (code === "42501") return toolResult({ error: "forbidden", message: (e as Error).message }, true);
     if (code === "22023") return toolResult({ error: "invalid_arguments", message: (e as Error).message }, true);
+    if (code === "54000") return toolResult({ error: "rate_limited", message: "Забагато викликів. Повтори за хвилину." }, true);
     throw e;
   }
 }

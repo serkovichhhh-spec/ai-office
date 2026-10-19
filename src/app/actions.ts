@@ -1,5 +1,6 @@
 "use server";
 import { safeNext } from "@/lib/mcp/oauth";
+import { PLAYBOOK_CATALOG } from "@/lib/orchestrator/registry";
 
 import { after } from "next/server";
 import { redirect } from "next/navigation";
@@ -42,6 +43,15 @@ export async function submitBriefAction(_prev: ActionState, form: FormData): Pro
   const parsed = BriefInput.safeParse(Object.fromEntries(form));
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Перевірте поля брифу" };
   const v = parsed.data;
+  const pb = PLAYBOOK_CATALOG.find((p) => p.key === String(form.get("playbook_key") ?? "reels_concepts"));
+  if (!pb) return { error: "Невідомий тип задачі" };
+  const fields: Record<string, string | string[]> = {};
+  for (const f of pb.fields) {
+    const raw = String(form.get(`f_${f.key}`) ?? "").trim().slice(0, f.maxLength ?? 2000);
+    if (f.required && !raw) return { error: `Заповніть поле «${f.label}»` };
+    if (f.type === "select" && raw && !f.options?.some((o) => o.value === raw)) return { error: `Невірне значення: ${f.label}` };
+    if (raw) fields[f.key] = f.type === "list" ? lines(raw) : f.type === "select" ? (f.options?.find((o) => o.value === raw)?.label ?? raw) : raw;
+  }
   let runId: string;
   try {
     runId = await asUser(db(), user.id, async (tx) => {
@@ -58,7 +68,8 @@ export async function submitBriefAction(_prev: ActionState, form: FormData): Pro
         priority: v.priority,
         acceptance_criteria: lines(form.get("acceptance_criteria")),
         references: lines(form.get("references")),
-        playbook_key: "reels_concepts",
+        playbook_key: pb.key,
+        fields,
       })}) as id`;
       const [{ id }] = await tx<{ id: string }[]>`select office.submit_brief(${briefId}, ${v.idempotency_key}) as id`;
       return id;

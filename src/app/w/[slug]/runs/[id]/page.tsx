@@ -1,3 +1,4 @@
+import { Fragment } from "react";
 import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/supabase";
 import { runDetail, stepLabel, workspaceBySlug, type RunDetail } from "@/lib/queries";
@@ -6,6 +7,8 @@ import { HANDOFF_STATUS, ROLE_LABEL, STEP_STATUS, ProviderBadge, StatusPill, Stu
 import { EXECUTOR_LABEL } from "@/lib/queries";
 import { cancelRunAction } from "../../../../actions";
 import { DecisionPanel } from "./DecisionPanel";
+import { PackageView, SectionView, type PackageV1 } from "./PackageView";
+import { PLAYBOOKS } from "@/lib/orchestrator/registry";
 
 export const dynamic = "force-dynamic";
 
@@ -63,7 +66,12 @@ export default async function RunPage({ params }: { params: Promise<{ slug: stri
   const canDecide = d.run.status === "needs_approval" && (ws.role === "owner" || ws.role === "approver");
   const canCancel = ["queued", "running", "needs_input", "needs_approval"].includes(d.run.status) && ws.role !== "viewer";
   const draftScripts = !latest ? (d.artifacts.filter((a) => a.kind === "scripts").at(-1)?.content as { scripts?: Script[] } | undefined) : undefined;
-  const content = (latest?.content ?? null) as null | {
+  const spec = PLAYBOOKS[d.brief.playbook_key]?.spec;
+  const pkgV1 = latest && (latest.content as { schema_version?: string }).schema_version === "Package.v1" ? (latest.content as unknown as PackageV1) : null;
+  const specDraft = !latest && spec
+    ? spec.steps.map((s) => ({ s, a: d.artifacts.filter((a) => a.kind === s.key).at(-1) })).filter((x) => x.a).at(-1)
+    : undefined;
+  const content = (pkgV1 ? null : latest?.content ?? null) as null | {
     strategy_summary: string; angles: Angle[]; scripts: Script[];
     review: { verdict: string; summary: string; open_issues: { script_index: number; severity: string; issue: string }[] } | null;
     unsupported_claims: string[]; sources_used: { title: string; url: string | null }[];
@@ -123,7 +131,14 @@ export default async function RunPage({ params }: { params: Promise<{ slug: stri
               <h2 id="deliv-title">{latest ? `Пакет v${latest.version}` : "Результат"}</h2>
               {latest && <span className="muted small">хеш {latest.content_hash.slice(0, 10)}</span>}
             </div>
-            {!content && !draftScripts && <p className="empty">{active ? "Команда працює — результат з’явиться тут." : "Результату немає."}</p>}
+            {pkgV1 && <PackageView pkg={pkgV1} />}
+            {specDraft?.a && (
+              <>
+                <p className="muted small" style={{ marginBottom: 10 }}>Проміжний результат «{specDraft.s.title}», ще не пройшов рев'ю:</p>
+                <SectionView content={specDraft.a.content} />
+              </>
+            )}
+            {!content && !pkgV1 && !specDraft && !draftScripts && <p className="empty">{active ? "Команда працює — результат з’явиться тут." : "Результату немає."}</p>}
             {!content && draftScripts?.scripts && (
               <>
                 <p className="muted small" style={{ marginBottom: 10 }}>Чернетка сценаріїв, ще не пройшла рев'ю:</p>
@@ -156,8 +171,8 @@ export default async function RunPage({ params }: { params: Promise<{ slug: stri
                   </>
                 )}
                 {content.unsupported_claims.length > 0 && (
-                  <p className="notice bad" style={{ marginTop: 12 }}>
-                    Потребують джерела: {content.unsupported_claims.join("; ")}
+                  <p className="notice" style={{ marginTop: 12 }}>
+                    <b>Потрібно підтвердити перед публікацією:</b> {content.unsupported_claims.join("; ")}
                   </p>
                 )}
                 {content.sources_used.length > 0 && (
@@ -214,6 +229,10 @@ export default async function RunPage({ params }: { params: Promise<{ slug: stri
               {d.brief.channel && (<><dt className="muted">Канал</dt><dd style={{ margin: 0 }}>{d.brief.channel}</dd></>)}
               <dt className="muted">Варіантів</dt><dd style={{ margin: 0 }}>{d.brief.deliverable_count}</dd>
               {d.brief.deadline && (<><dt className="muted">Дедлайн</dt><dd style={{ margin: 0 }}>{d.brief.deadline}</dd></>)}
+              {spec && (<><dt className="muted">Тип задачі</dt><dd style={{ margin: 0 }}>{spec.label}</dd></>)}
+              {spec?.briefFields.map((f) => d.brief.fields?.[f.key] ? (
+                <Fragment key={f.key}><dt className="muted">{f.label}</dt><dd style={{ margin: 0, whiteSpace: "pre-line" }}>{String(d.brief.fields[f.key])}</dd></Fragment>
+              ) : null)}
             </dl>
             {d.brief.acceptance_criteria.length > 0 && (
               <ul className="small" style={{ marginTop: 8 }}>{d.brief.acceptance_criteria.map((c, i) => <li key={i}>{c}</li>)}</ul>
@@ -268,7 +287,7 @@ function ScriptCard({ s, i }: { s: Script; i: number }) {
         ))}
       </ol>
       <p className="small" style={{ marginTop: 6 }}><b>CTA:</b> {s.cta}</p>
-      {s.claims_needing_source.length > 0 && <p className="small error">Без джерела: {s.claims_needing_source.join("; ")}</p>}
+      {s.claims_needing_source.length > 0 && <p className="small claims">Потрібно підтвердити: {s.claims_needing_source.join("; ")}</p>}
     </article>
   );
 }

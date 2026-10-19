@@ -225,3 +225,23 @@ pre.json { font-size: 12px; background: var(--paper); padding: 10px; border-radi
 .room-title { font-size: 14px; margin-bottom: 10px; display: inline-block; background: var(--paper); padding-right: 6px; }
 .desk[data-activity="unassigned"], .desk[data-activity="awaiting_bridge"] { opacity: 0.72; }
 .desk[data-activity="unassigned"] .lamp, .desk[data-activity="awaiting_bridge"] .lamp { background: transparent; border: 1px dashed var(--muted); }
+
+/* Brief: playbook picker */
+.playbook-pick { border: 0; padding: 0; margin: 0; display: grid; gap: 8px; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+.playbook-pick legend { font-weight: 600; font-size: 13px; margin-bottom: 6px; }
+.playbook-pick label { display: grid; gap: 2px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; cursor: pointer; background: var(--desk); }
+.playbook-pick label.on { border-color: var(--ink); box-shadow: 0 0 0 1px var(--ink) inset; }
+.playbook-pick input { position: absolute; opacity: 0; pointer-events: none; }
+.playbook-pick label:focus-within { outline: 2px solid var(--ink); outline-offset: 2px; }
+
+/* Generic package view */
+.fields { display: grid; gap: 8px; margin: 0; }
+.fields > div { display: grid; grid-template-columns: minmax(110px, 160px) minmax(0, 1fr); gap: 10px; }
+.fields dt { font-size: 12px; color: var(--muted); padding-top: 2px; }
+.fields dd { margin: 0; min-width: 0; }
+.fields dd p, .fields dd ul { margin: 0; }
+.fields dd ul { padding-left: 18px; }
+.cards { display: grid; gap: 10px; }
+.claims { margin-top: 8px; padding: 6px 10px; border-radius: 8px; background: color-mix(in srgb, #d99a00 12%, transparent); color: var(--ink); }
+.json.prompt { white-space: pre-wrap; word-break: break-word; font-size: 12px; }
+@media (max-width: 560px) { .fields > div { grid-template-columns: minmax(0, 1fr); gap: 2px; } }

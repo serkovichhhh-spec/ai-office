@@ -7,6 +7,7 @@ import { PixelAvatar } from "../../components/PixelAvatar";
 import { LiveRefresh } from "../../components/LiveRefresh";
 import { ACTIVITY, HANDOFF_STATUS, ProviderBadge, StatusPill, StubBadge, usd, when } from "../../components/ui";
 import { BriefForm } from "./BriefForm";
+import { PLAYBOOK_CATALOG } from "@/lib/orchestrator/registry";
 
 export const dynamic = "force-dynamic";
 
@@ -93,7 +94,7 @@ export default async function OfficePage({ params }: { params: Promise<{ slug: s
                 <h2 id="brief-title">Новий бриф</h2>
                 <span className="muted small">Сценарій: концепції та сценарії рілсів</span>
               </div>
-              <BriefForm workspaceId={ws.id} slug={ws.slug} idempotencyKey={`brief-${randomUUID()}`} />
+              <BriefForm workspaceId={ws.id} slug={ws.slug} idempotencyKey={`brief-${randomUUID()}`} catalog={PLAYBOOK_CATALOG} />
             </section>
           )}
           <section className="panel" aria-labelledby="runs-title">

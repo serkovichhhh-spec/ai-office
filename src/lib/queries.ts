@@ -2,6 +2,10 @@ import "server-only";
 import { asUser, db } from "./db";
 import { PLAYBOOKS } from "./orchestrator/registry";
 
+const SPEC_STEP_TITLES: Record<string, string> = Object.fromEntries(
+  Object.values(PLAYBOOKS).flatMap((p) => (p.spec?.steps ?? []).map((s) => [s.key, s.title])),
+);
+
 export const EXECUTOR_LABEL: Record<string, string> = { claude_session: "Claude", chatgpt: "ChatGPT", human: "людину" };
 
 function hhmm(ts: string | null): string {
@@ -161,7 +165,7 @@ export function stepLabel(key: string): string {
       review: "Рев'ю",
       package: "Пакування",
     } as Record<string, string>
-  )[key] ?? key;
+  )[key] ?? SPEC_STEP_TITLES[key] ?? key;
 }
 
 export interface RunListItem {
@@ -206,7 +210,7 @@ export interface RunDetail {
   };
   brief: {
     title: string; objective: string; audience: string; channel: string; deliverable_count: number;
-    acceptance_criteria: string[]; deadline: string | null; priority: string;
+    acceptance_criteria: string[]; deadline: string | null; priority: string; playbook_key: string; fields: Record<string, unknown>;
   };
   steps: Array<{
     id: string; step_key: string; agent_role: string; cycle: number; status: string; attempt: number; max_attempts: number;
@@ -228,7 +232,7 @@ export async function runDetail(userId: string, runId: string): Promise<RunDetai
              r.started_at, r.finished_at, b.title, b.channel
       from office.runs r join office.briefs b on b.id = r.brief_id where r.id = ${runId}`;
     if (!run) return null;
-    const [brief] = await tx`select title, objective, audience, channel, deliverable_count, acceptance_criteria, deadline::text as deadline, priority
+    const [brief] = await tx`select title, objective, audience, channel, deliverable_count, acceptance_criteria, deadline::text as deadline, priority, playbook_key, fields
                              from office.briefs where id = ${run.brief_id}`;
     const steps = await tx`select id, step_key, agent_role, cycle, status, attempt, max_attempts, provider, model,
                                   cost_usd::text, tokens_in::text, tokens_out::text, error, started_at, finished_at, executor

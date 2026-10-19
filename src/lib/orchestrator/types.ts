@@ -23,6 +23,8 @@ export interface BriefRow {
   deadline: string | null;
   priority: string;
   playbook_key: string;
+  /** Playbook-specific brief fields (PlaybookSpec.briefFields). */
+  fields?: Record<string, unknown>;
 }
 
 export interface AgentRow {

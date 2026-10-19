@@ -24,6 +24,7 @@ export function briefText(b: BriefRow): string {
       acceptance_criteria: b.acceptance_criteria,
       deadline: b.deadline,
       priority: b.priority,
+      ...(b.fields && Object.keys(b.fields).length ? { details: b.fields } : {}),
     },
     null,
     2,
