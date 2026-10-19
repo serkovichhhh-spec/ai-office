@@ -34,7 +34,7 @@ export function briefText(b: BriefRow): string {
 export function knowledgeText(items: KnowledgeItem[]): string {
   if (items.length === 0) return "(затверджених знань немає)";
   return items
-    .map((k) => `### ${k.title} [${k.kind}]${k.freshness_date ? ` (актуально на ${k.freshness_date})` : ""}\n${k.body}`)
+    .map((k) => `### ${k.title} [${k.kind}]${k.id ? ` record_id=${k.id} version=${k.version ?? "1"}` : ""}${k.freshness_date ? ` (актуально на ${k.freshness_date})` : ""}\n${k.body}`)
     .join("\n\n");
 }
 

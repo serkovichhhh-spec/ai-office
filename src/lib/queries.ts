@@ -1,10 +1,6 @@
 import "server-only";
 import { asUser, db } from "./db";
-import { PLAYBOOKS } from "./orchestrator/registry";
-
-const SPEC_STEP_TITLES: Record<string, string> = Object.fromEntries(
-  Object.values(PLAYBOOKS).flatMap((p) => (p.spec?.steps ?? []).map((s) => [s.key, s.title])),
-);
+import { PLAYBOOKS, stepTitle } from "./orchestrator/registry";
 
 export const EXECUTOR_LABEL: Record<string, string> = { claude_session: "Claude", chatgpt: "ChatGPT", human: "людину" };
 
@@ -165,7 +161,7 @@ export function stepLabel(key: string): string {
       review: "Рев'ю",
       package: "Пакування",
     } as Record<string, string>
-  )[key] ?? SPEC_STEP_TITLES[key] ?? key;
+  )[key] ?? stepTitle(key) ?? key;
 }
 
 export interface RunListItem {
@@ -206,11 +202,11 @@ export async function listHandoffs(userId: string, wsId: string): Promise<Handof
 export interface RunDetail {
   run: RunListItem & {
     workspace_id: string; brief_id: string; budget_usd: string; tokens_in: string; tokens_out: string;
-    error_code: string | null; started_at: string | null; finished_at: string | null;
+    error_code: string | null; started_at: string | null; finished_at: string | null; playbook_version: number;
   };
   brief: {
     title: string; objective: string; audience: string; channel: string; deliverable_count: number;
-    acceptance_criteria: string[]; deadline: string | null; priority: string; playbook_key: string; fields: Record<string, unknown>;
+    acceptance_criteria: string[]; deadline: string | null; priority: string; playbook_key: string; playbook_version: number; fields: Record<string, unknown>;
   };
   steps: Array<{
     id: string; step_key: string; agent_role: string; cycle: number; status: string; attempt: number; max_attempts: number;
@@ -229,10 +225,10 @@ export async function runDetail(userId: string, runId: string): Promise<RunDetai
     const [run] = await tx`
       select r.id, r.workspace_id, r.brief_id, r.status, r.provider, r.revision, r.cost_usd::text, r.budget_usd::text,
              r.tokens_in::text, r.tokens_out::text, r.error_code, r.error_message, r.created_at, r.updated_at,
-             r.started_at, r.finished_at, b.title, b.channel
+             r.started_at, r.finished_at, r.playbook_version, b.title, b.channel
       from office.runs r join office.briefs b on b.id = r.brief_id where r.id = ${runId}`;
     if (!run) return null;
-    const [brief] = await tx`select title, objective, audience, channel, deliverable_count, acceptance_criteria, deadline::text as deadline, priority, playbook_key, fields
+    const [brief] = await tx`select title, objective, audience, channel, deliverable_count, acceptance_criteria, deadline::text as deadline, priority, playbook_key, playbook_version, fields
                              from office.briefs where id = ${run.brief_id}`;
     const steps = await tx`select id, step_key, agent_role, cycle, status, attempt, max_attempts, provider, model,
                                   cost_usd::text, tokens_in::text, tokens_out::text, error, started_at, finished_at, executor

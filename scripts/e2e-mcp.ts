@@ -121,6 +121,52 @@ async function main() {
     check("artifacts credit the real author", arts.map((a) => `${a.kind}:${a.model}`).join(",") === "strategy:chatgpt,scripts:claude-session,review:chatgpt", arts);
     const status = (await tool(gpt, "office_get_team_status")).structuredContent;
     check("team status shows run waiting for owner", status.runs_waiting_for_owner === 1, status);
+
+    // Library playbook (outdoor_print_pack v1): Claude authors prepare + build, ChatGPT reviews — per-step executors.
+    const { stubFromJsonSchema } = await import("../src/lib/orchestrator/stubgen");
+    const lRun = await asUser(app, OWNER, async (tx) => {
+      const [{ id: b }] = await tx`select office.create_brief(${ws}, ${tx.json({
+        title: "Білборди MCP", objective: "Перевірити бібліотечний плейбук через MCP", deliverable_count: 1,
+        playbook_key: "outdoor_print_pack", playbook_version: 1, fields: { medium: "billboard" },
+      })}) as id`;
+      const [{ id }] = await tx`select office.submit_brief(${b}, 'e2e-mcp-lib-0001') as id`;
+      return id as string;
+    });
+    const [lr] = await su`select playbook_version from office.runs where id = ${lRun}`;
+    check("library run pinned to playbook v1", lr.playbook_version === 1, lr);
+    const libPlan = [
+      { who: "Claude", ctx: claude, step: "prepare", schema: "Preparation" },
+      { who: "Claude", ctx: claude, step: "build", schema: "PrintOutput" },
+      { who: "ChatGPT", ctx: gpt, step: "review", schema: "ReviewDecision" },
+    ];
+    for (const p of libPlan) {
+      await tick(app, session, { workerId: "e2e-mcp-lib" });
+      const claim = (await tool(p.ctx, "office_claim_task")).structuredContent;
+      check(`library ${p.step}: ${p.who} gets it with ${p.schema} contract`, claim.claimed === true && claim.envelope.step === p.step && claim.envelope.output_schema_name === p.schema, claim.envelope ? { step: claim.envelope.step, schema: claim.envelope.output_schema_name } : claim);
+      if (!claim.claimed) break;
+      const base = { task_id: claim.envelope.task_id, attempt_id: claim.attempt_id, lease_token: claim.lease_token };
+      if (p.step === "prepare") {
+        const bad = await tool(p.ctx, "office_submit_result", { ...base, result: { status: "ready" } });
+        check("library: structural errors reported instantly (Ajv), lease kept", bad.isError === true && bad.structuredContent.issues.length > 0, bad.structuredContent);
+      }
+      const answer = stubFromJsonSchema(claim.envelope.output_schema) as Record<string, unknown>;
+      if (p.step === "review") {
+        // A real reviewer scores the playbook's own criteria; evidence must be 5 to pass.
+        const lib = JSON.parse(readFileSync(join(ROOT, "src/lib/orchestrator/library/playbooks.json"), "utf8")) as { playbook_key: string; review: { criteria: { key: string }[] } }[];
+        const crit = lib.find((x) => x.playbook_key === "outdoor_print_pack")!.review.criteria;
+        answer.scores = crit.map((c) => ({ key: c.key, score: 5, evidence_pointer: "/summary", reason: "Перевірено" }));
+        answer.issues = [];
+      }
+      const ok = (await tool(p.ctx, "office_submit_result", { ...base, result: answer })).structuredContent;
+      check(`library ${p.step}: accepted`, ok.accepted === true, ok);
+    }
+    await tick(app, session, { workerId: "e2e-mcp-lib" });
+    const [lFinal] = await su`select r.status, a.content->>'outcome' as outcome from office.runs r
+      join office.artifacts a on a.run_id = r.id and a.kind = 'deliverable' where r.id = ${lRun}`;
+    check("library run: package ready_for_approval", lFinal?.status === "needs_approval" && lFinal?.outcome === "ready_for_approval",
+      { lFinal, steps: await su`select step_key, status, agent_request->>'note' as note, error from office.steps where run_id = ${lRun} order by created_at` });
+    const lExec = await su`select step_key, executor from office.steps where run_id = ${lRun} and executor is not null order by created_at`;
+    check("library run: executors from the playbook (claude, claude, chatgpt)", lExec.map((x) => x.executor).join(",") === "claude_session,claude_session,chatgpt", lExec);
     await app.end();
   } finally {
     await su.end();

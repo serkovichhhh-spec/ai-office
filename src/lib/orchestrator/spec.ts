@@ -20,16 +20,8 @@ import type { Playbook } from "./registry";
 
 export const MAX_REVIEW_LOOPS = 1;
 
-export interface BriefFieldSpec {
-  key: string;
-  label: string;
-  type: "text" | "textarea" | "select" | "list";
-  required?: boolean;
-  options?: { value: string; label: string }[];
-  hint?: string;
-  placeholder?: string;
-  maxLength?: number;
-}
+import type { BriefFieldSpec } from "./catalog";
+export type { BriefFieldSpec } from "./catalog";
 
 export interface StepSpec<T = unknown> {
   key: string;
@@ -157,7 +149,7 @@ export function validateSpec(spec: PlaybookSpec): void {
   }
 }
 
-export function playbookFromSpec(spec: PlaybookSpec): Playbook & { spec: PlaybookSpec } {
+export function playbookFromSpec(spec: PlaybookSpec, opts: { version?: number; hidden?: boolean } = {}): Playbook & { spec: PlaybookSpec } {
   validateSpec(spec);
   const order = spec.steps.map((s) => s.key);
   const stepByKey = new Map(spec.steps.map((s) => [s.key, s]));
@@ -313,9 +305,16 @@ export function playbookFromSpec(spec: PlaybookSpec): Playbook & { spec: Playboo
   const roles = [...new Set(["orchestrator", ...spec.steps.map((s) => s.seat), spec.review.seat])];
   return {
     key: spec.key,
+    version: opts.version ?? 1,
     title: spec.title,
     roles,
     spec,
+    catalog: {
+      key: spec.key, version: opts.version ?? 1, title: spec.title, label: spec.label, description: spec.description,
+      group: "Дизайн і креатив", maxCount: 6, fields: spec.briefFields, hidden: opts.hidden,
+    },
+    stepTitles: Object.fromEntries(spec.steps.map((s) => [s.key, s.title])),
+    schemas: Object.fromEntries([...spec.steps.map((s) => [s.schemaName, s.schema]), ["review_decision", ReviewDecisionSchema]]),
     async execute(ctx, ai) {
       const k = ctx.step.step_key;
       if (k === "intake") return intake(ctx);

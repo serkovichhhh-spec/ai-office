@@ -6,6 +6,7 @@ import { oohConcepts, oohConceptsSpec } from "@/lib/orchestrator/playbooks/ooh-c
 import { OUTPUT_SCHEMAS, PLAYBOOK_CATALOG } from "@/lib/orchestrator/registry";
 import { playbookFromSpec, validateSpec, type PlaybookSpec } from "@/lib/orchestrator/spec";
 import { stubFromJsonSchema } from "@/lib/orchestrator/stubgen";
+import { hasContract } from "@/lib/orchestrator/contracts";
 import type { StepContext, StepResult } from "@/lib/orchestrator/types";
 
 function ctx(step_key: string, input: Record<string, unknown>, artifacts: StepContext["artifacts"]): StepContext {
@@ -114,13 +115,13 @@ describe("declarative playbook engine", () => {
 
   it("stub generator satisfies every registered output schema", () => {
     for (const [name, schema] of Object.entries(OUTPUT_SCHEMAS)) {
+      if (hasContract(name)) continue; // library contracts (Ajv) are covered in library.test.ts
       const js = z.toJSONSchema(schema, { target: "draft-7" });
       expect(() => schema.parse(stubFromJsonSchema(js as never, name)), name).not.toThrow();
     }
   });
 
-  it("catalogue lists both playbooks with serialisable fields", () => {
-    expect(PLAYBOOK_CATALOG.map((p) => p.key)).toEqual(["reels_concepts", "ooh_concepts"]);
-    expect(JSON.parse(JSON.stringify(PLAYBOOK_CATALOG))[1].fields[0].key).toBe("formats");
+  it("catalogue is serialisable for the client form", () => {
+    expect(JSON.parse(JSON.stringify(PLAYBOOK_CATALOG))).toEqual(PLAYBOOK_CATALOG);
   });
 });

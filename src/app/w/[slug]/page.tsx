@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/supabase";
-import { EXECUTOR_LABEL, executors, floorState, listHandoffs, listRuns, workspaceBySlug } from "@/lib/queries";
+import { EXECUTOR_LABEL, executors, floorState, listHandoffs, listKnowledge, listRuns, workspaceBySlug } from "@/lib/queries";
 import { revokeExecutorAction } from "../../actions";
 import { PixelAvatar } from "../../components/PixelAvatar";
 import { LiveRefresh } from "../../components/LiveRefresh";
@@ -22,7 +22,7 @@ export default async function OfficePage({ params }: { params: Promise<{ slug: s
   const user = await requireUser();
   const ws = await workspaceBySlug(user.id, slug);
   if (!ws) notFound();
-  const [floor, runs, handoffs, execs] = await Promise.all([floorState(user.id, ws), listRuns(user.id, ws.id), listHandoffs(user.id, ws.id), executors(user.id, ws.id)]);
+  const [floor, runs, handoffs, execs, knowledge] = await Promise.all([floorState(user.id, ws), listRuns(user.id, ws.id), listHandoffs(user.id, ws.id), executors(user.id, ws.id), listKnowledge(user.id, ws.id)]);
 
   const active = runs.some((r) => r.status === "queued" || r.status === "running");
   const waiting = runs.filter((r) => r.status === "needs_approval");
@@ -94,7 +94,7 @@ export default async function OfficePage({ params }: { params: Promise<{ slug: s
                 <h2 id="brief-title">Новий бриф</h2>
                 <span className="muted small">Сценарій: концепції та сценарії рілсів</span>
               </div>
-              <BriefForm workspaceId={ws.id} slug={ws.slug} idempotencyKey={`brief-${randomUUID()}`} catalog={PLAYBOOK_CATALOG} />
+              <BriefForm workspaceId={ws.id} slug={ws.slug} idempotencyKey={`brief-${randomUUID()}`} catalog={PLAYBOOK_CATALOG} knowledge={knowledge.filter((k) => k.status === "approved").map((k) => ({ id: k.id, title: k.title, kind: k.kind }))} />
             </section>
           )}
           <section className="panel" aria-labelledby="runs-title">

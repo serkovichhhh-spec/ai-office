@@ -37,6 +37,9 @@ export interface AgentRow {
 }
 
 export interface KnowledgeItem {
+  /** Record id and content version (12-char hash) — what KnowledgeRef cites. */
+  id?: string;
+  version?: string;
   title: string;
   kind: string;
   body: string;
@@ -45,6 +48,8 @@ export interface KnowledgeItem {
 }
 
 export interface ArtifactItem {
+  id?: string;
+  hash?: string;
   kind: string;
   version: number;
   content: unknown;
@@ -53,7 +58,7 @@ export interface ArtifactItem {
 /** Shape returned by office.worker_context(step_id). */
 export interface StepContext {
   step: StepRow;
-  run: { id: string; revision: number; playbook_key: string; budget_usd: string | number; cost_usd: string | number };
+  run: { id: string; revision: number; playbook_key: string; playbook_version?: number; budget_usd: string | number; cost_usd: string | number };
   brief: BriefRow;
   workspace: { id: string; slug: string; name: string };
   agent: AgentRow | null;
@@ -66,6 +71,8 @@ export interface NextStep {
   agent_role: string;
   input?: Record<string, unknown>;
   depends_on?: string[];
+  /** Executor for this step (claude_session | chatgpt | human); defaults to the seat's configured executor. */
+  executor?: string;
 }
 
 /** Payload for office.worker_complete. */

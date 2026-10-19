@@ -1,0 +1,1314 @@
+playbook_key: smm_content_plan
+title: Контент-план SMM
+use_when: Для календаря контенту й завдань команді на визначений період. Готові публікації створює social_content_pack.
+brief_fields:
+- key: period_start
+  type: string
+  required: true
+  hint: Дата YYYY-MM-DD.
+- key: period_end
+  type: string
+  required: true
+  hint: Дата YYYY-MM-DD; період до 93 днів.
+- key: channels
+  type: list
+  required: true
+  hint: '1-5 рядків: канали публікацій.'
+- key: pillars
+  type: list
+  required: false
+  hint: 1-12 рубрик.
+- key: capacity_knowledge_ids
+  type: list
+  required: true
+  hint: 1-10 ID затверджених ресурсних обмежень.
+- key: events_knowledge_ids
+  type: list
+  required: false
+  hint: 0-30 ID підтверджених подій.
+steps:
+- key: prepare
+  seat: smm
+  executor: chatgpt
+  depends_on: []
+  inputs:
+  - brief
+  - knowledge
+  task: Визначте рубрики, цілі та логіку чергування. Зіставте обсяг із ресурсами й підтвердженими подіями. Сформуйте work_items
+    для майбутніх публікацій. Використовуйте лише затверджені knowledge для фактів; решту винесіть у claims_needing_source.
+    За браку обов’язкового входу поверніть status=blocked і точні blocking_questions.
+  output_schema:
+    $ref: schemas.json#/$defs/Preparation
+  quality_checks:
+  - Повнота входів та межі задачі
+  - Версії knowledge й джерела тверджень
+  - Реалістичність запропонованого плану
+- key: build
+  seat: smm
+  executor: chatgpt
+  depends_on:
+  - prepare
+  inputs:
+  - brief
+  - knowledge
+  - artifact:prepare
+  task: Створіть рівно deliverable_count елементів календаря. Для кожного задайте дату з часовим поясом, мету, гачок-гіпотезу,
+    CTA та вимоги продакшну. Додайте вимірювання й залежності; готові тексти тут не потрібні. Використовуйте лише затверджені
+    knowledge для фактів; решту винесіть у claims_needing_source. За браку обов’язкового входу поверніть status=blocked і
+    точні blocking_questions.
+  output_schema:
+    $ref: schemas.json#/$defs/ContentPlanOutput
+  quality_checks:
+  - Дати в періоді, канал у brief.channels
+  - Кількість items дорівнює deliverable_count
+  - Навантаження не перевищує knowledge-ліміти
+review:
+  seat: reviewer
+  executor: claude_session
+  criteria:
+  - key: evidence
+    what: Усі фактичні твердження мають чинні knowledge refs; похідні цифри відтворюються.
+    pass_if: score == 5
+  - key: brief_fit
+    what: Досягнута мета, виконані обсяг, канал і acceptance_criteria.
+    pass_if: score >= 4
+  - key: brand
+    what: Бренд, маскот, шрифт, тон і CTA відповідають pinned knowledge; для аналітики збережена термінологія.
+    pass_if: score >= 4
+  - key: execution
+    what: Пакет можна виконати без вигаданих налаштувань, даних, активів і відповідальних.
+    pass_if: score >= 4
+  - key: specialist
+    what: Календар різноманітний, забезпечений ресурсами й має перевірювані цілі.
+    pass_if: score >= 4
+  send_back_to: build
+package:
+  sections:
+  - summary
+  - items
+  - cadence_rationale
+  - production_dependencies
+  - claims_needing_source
+  - assumptions
+  - blocking_questions
+  - source_uses
+  - review
+handoff:
+  to: smm
+  payload:
+  - items
+  - cadence_rationale
+  - production_dependencies
+  - source_uses
+  - claims_needing_source
+  - assumptions
+  - blocking_questions
+  - review
+  - approved_manifest
+risks:
+- 'Непосильна частота: перевірити capacity'
+- 'Вигадані інфоприводи: лише knowledge'
+- 'Непідтверджений прогноз охоплення: лише гіпотеза'
+---
+playbook_key: social_content_pack
+title: Пости, сторіз і контент-мейкінг
+use_when: Для готових соціальних публікацій, серій сторіз, каруселей та завдань на зйомку. Окремий відеосценарій обирайте
+  через reels_concepts.
+brief_fields:
+- key: content_kind
+  type: enum
+  required: true
+  hint: 'Оберіть одне: post, stories, carousel, short_video.'
+- key: channels
+  type: list
+  required: true
+  hint: 1-5 каналів.
+- key: plan_item_ids
+  type: list
+  required: false
+  hint: 0-30 ID елементів затвердженого плану.
+- key: available_asset_ids
+  type: list
+  required: false
+  hint: 0-30 доступних активів.
+- key: production_constraints
+  type: string
+  required: true
+  hint: Локація, люди, час; 1-3000 символів.
+- key: platform_spec_knowledge_ids
+  type: list
+  required: true
+  hint: 1-10 ID актуальних обмежень форматів.
+steps:
+- key: prepare
+  seat: smm
+  executor: claude_session
+  depends_on: []
+  inputs:
+  - brief
+  - knowledge
+  task: Визначте меседж кожної публікації та роль у комунікації. Зіставте задум із доступними активами та можливостями зйомки.
+    Опишіть work_items без повторення одного сюжету. Використовуйте лише затверджені knowledge для фактів; решту винесіть
+    у claims_needing_source. За браку обов’язкового входу поверніть status=blocked і точні blocking_questions.
+  output_schema:
+    $ref: schemas.json#/$defs/Preparation
+  quality_checks:
+  - Повнота входів та межі задачі
+  - Версії knowledge й джерела тверджень
+  - Реалістичність запропонованого плану
+- key: build
+  seat: content_maker
+  executor: claude_session
+  depends_on:
+  - prepare
+  inputs:
+  - brief
+  - knowledge
+  - artifact:prepare
+  task: Підготуйте рівно deliverable_count одиниць контенту. Для сторіз або каруселі розкладіть матеріал на послідовні frames;
+    для зйомки заповніть capture_brief. Додайте остаточні тексти, доступність і правила вимірювання. Використовуйте лише затверджені
+    knowledge для фактів; решту винесіть у claims_needing_source. За браку обов’язкового входу поверніть status=blocked і
+    точні blocking_questions.
+  output_schema:
+    $ref: schemas.json#/$defs/SocialPackOutput
+  quality_checks:
+  - Тексти поміщаються у підтверджені формати
+  - Сторіз і карусель мають frames; зйомка має capture_brief
+  - units рівно deliverable_count, без дублювання
+review:
+  seat: reviewer
+  executor: chatgpt
+  criteria:
+  - key: evidence
+    what: Усі фактичні твердження мають чинні knowledge refs; похідні цифри відтворюються.
+    pass_if: score == 5
+  - key: brief_fit
+    what: Досягнута мета, виконані обсяг, канал і acceptance_criteria.
+    pass_if: score >= 4
+  - key: brand
+    what: Бренд, маскот, шрифт, тон і CTA відповідають pinned knowledge; для аналітики збережена термінологія.
+    pass_if: score >= 4
+  - key: execution
+    what: Пакет можна виконати без вигаданих налаштувань, даних, активів і відповідальних.
+    pass_if: score >= 4
+  - key: specialist
+    what: Зрозумілий перший кадр, логічна послідовність, конкретне завдання на зйомку.
+    pass_if: score >= 4
+  send_back_to: build
+package:
+  sections:
+  - summary
+  - units
+  - publishing_checklist
+  - claims_needing_source
+  - assumptions
+  - blocking_questions
+  - source_uses
+  - review
+handoff:
+  to: smm
+  payload:
+  - units
+  - publishing_checklist
+  - source_uses
+  - claims_needing_source
+  - assumptions
+  - blocking_questions
+  - review
+  - approved_manifest
+risks:
+- 'Змішування одиниці й кадру: count рахує units'
+- 'Немає активів: передбачити зйомку або blocked'
+- 'Чужа музика чи обличчя: перевірити права'
+---
+playbook_key: graphic_design_pack
+title: Графічні креативи й банери
+use_when: Для ТЗ на цифрові банери, рекламні та соціальні макети. Друковані носії веде outdoor_print_pack.
+brief_fields:
+- key: placements
+  type: list
+  required: true
+  hint: 1-12 точних місць розміщення.
+- key: format_knowledge_ids
+  type: list
+  required: true
+  hint: 1-12 ID технічних специфікацій.
+- key: asset_ids
+  type: list
+  required: false
+  hint: 0-30 доступних активів.
+- key: art_direction_artifact_id
+  type: string
+  required: false
+  hint: ID затвердженого артнапряму або порожнє поле.
+- key: required_copy
+  type: list
+  required: false
+  hint: 0-20 рядків обов’язкового тексту; факти мають бути в knowledge.
+steps:
+- key: prepare
+  seat: creative_director
+  executor: claude_session
+  depends_on: []
+  inputs:
+  - brief
+  - knowledge
+  task: Визначте візуальну ієрархію й меседж. Перевірте доступність бренд-активів та специфікацій розміщення. Опишіть work_items
+    як окремі креативи, а формати як їх адаптації. Використовуйте лише затверджені knowledge для фактів; решту винесіть у
+    claims_needing_source. За браку обов’язкового входу поверніть status=blocked і точні blocking_questions.
+  output_schema:
+    $ref: schemas.json#/$defs/Preparation
+  quality_checks:
+  - Повнота входів та межі задачі
+  - Версії knowledge й джерела тверджень
+  - Реалістичність запропонованого плану
+- key: build
+  seat: graphic_designer
+  executor: claude_session
+  depends_on:
+  - prepare
+  inputs:
+  - brief
+  - knowledge
+  - artifact:prepare
+  task: Видайте рівно deliverable_count creative_spec. Заповніть композицію, фінальні тексти, формати, адаптації та чеклісти.
+    Промпти описують генерацію зображення, а текст і затверджені бренд-активи накладаються у продакшні. Використовуйте лише
+    затверджені knowledge для фактів; решту винесіть у claims_needing_source. За браку обов’язкового входу поверніть status=blocked
+    і точні blocking_questions.
+  output_schema:
+    $ref: schemas.json#/$defs/GraphicsOutput
+  quality_checks:
+  - Кожний формат має knowledge refs
+  - Оригінальні бренд-активи задані через asset_id/version
+  - creatives рівно deliverable_count
+review:
+  seat: reviewer
+  executor: chatgpt
+  criteria:
+  - key: evidence
+    what: Усі фактичні твердження мають чинні knowledge refs; похідні цифри відтворюються.
+    pass_if: score == 5
+  - key: brief_fit
+    what: Досягнута мета, виконані обсяг, канал і acceptance_criteria.
+    pass_if: score >= 4
+  - key: brand
+    what: Бренд, маскот, шрифт, тон і CTA відповідають pinned knowledge; для аналітики збережена термінологія.
+    pass_if: score >= 4
+  - key: execution
+    what: Пакет можна виконати без вигаданих налаштувань, даних, активів і відповідальних.
+    pass_if: score >= 4
+  - key: specialist
+    what: Читабельна ієрархія, коректні адаптації та здійсненний продакшн.
+    pass_if: score >= 4
+  send_back_to: build
+package:
+  sections:
+  - summary
+  - creatives
+  - export_checklist
+  - claims_needing_source
+  - assumptions
+  - blocking_questions
+  - source_uses
+  - review
+handoff:
+  to: graphic_designer
+  payload:
+  - creatives
+  - export_checklist
+  - source_uses
+  - claims_needing_source
+  - assumptions
+  - blocking_questions
+  - review
+  - approved_manifest
+risks:
+- 'AI перемальовує маскота: заборона в prompts'
+- 'Нечитабельна мобільна версія: safe area і QA'
+- 'Вигадані розміри: blocked без специфікацій'
+---
+playbook_key: campaign_art_direction
+title: Візуальна система кампанії
+use_when: Для розробки 1-3 візуальних напрямів і правил адаптації кампанії. Фінальні макети замовляються окремим плейбуком
+  після вибору напряму.
+brief_fields:
+- key: campaign_channels
+  type: list
+  required: true
+  hint: 1-12 каналів.
+- key: mandatory_asset_ids
+  type: list
+  required: false
+  hint: 0-30 активів.
+- key: visual_constraints
+  type: string
+  required: true
+  hint: Обмеження й бажана відмінність; 1-3000 символів.
+- key: reference_notes
+  type: list
+  required: false
+  hint: 0-20 коментарів до референсів.
+steps:
+- key: prepare
+  seat: creative_director
+  executor: claude_session
+  depends_on: []
+  inputs:
+  - brief
+  - knowledge
+  task: Виділіть незмінні бренд-елементи й простір для експерименту. Визначте принципи, за якими напрями будуть відрізнятися.
+    Опишіть work_items для кожного напряму. Використовуйте лише затверджені knowledge для фактів; решту винесіть у claims_needing_source.
+    За браку обов’язкового входу поверніть status=blocked і точні blocking_questions.
+  output_schema:
+    $ref: schemas.json#/$defs/Preparation
+  quality_checks:
+  - Повнота входів та межі задачі
+  - Версії knowledge й джерела тверджень
+  - Реалістичність запропонованого плану
+- key: build
+  seat: creative_director
+  executor: claude_session
+  depends_on:
+  - prepare
+  inputs:
+  - brief
+  - knowledge
+  - artifact:prepare
+  task: Створіть рівно deliverable_count напрямів, максимум три. Для кожного дайте concept, design_brief, системні правила,
+    адаптації й do_not. Рекомендуйте один напрям із поясненням у summary, не оголошуючи його затвердженим. Використовуйте
+    лише затверджені knowledge для фактів; решту винесіть у claims_needing_source. За браку обов’язкового входу поверніть
+    status=blocked і точні blocking_questions.
+  output_schema:
+    $ref: schemas.json#/$defs/ArtDirectionOutput
+  quality_checks:
+  - Напрями відрізняються композиційною ідеєю
+  - recommended_direction_id існує у directions
+  - Бренд збережений у всіх каналах
+review:
+  seat: reviewer
+  executor: chatgpt
+  criteria:
+  - key: evidence
+    what: Усі фактичні твердження мають чинні knowledge refs; похідні цифри відтворюються.
+    pass_if: score == 5
+  - key: brief_fit
+    what: Досягнута мета, виконані обсяг, канал і acceptance_criteria.
+    pass_if: score >= 4
+  - key: brand
+    what: Бренд, маскот, шрифт, тон і CTA відповідають pinned knowledge; для аналітики збережена термінологія.
+    pass_if: score >= 4
+  - key: execution
+    what: Пакет можна виконати без вигаданих налаштувань, даних, активів і відповідальних.
+    pass_if: score >= 4
+  - key: specialist
+    what: Система масштабується на всі канали, відмінності між напрямами суттєві.
+    pass_if: score >= 4
+  send_back_to: build
+package:
+  sections:
+  - summary
+  - directions
+  - recommended_direction_id
+  - claims_needing_source
+  - assumptions
+  - blocking_questions
+  - source_uses
+  - review
+handoff:
+  to: graphic_designer
+  payload:
+  - directions
+  - recommended_direction_id
+  - source_uses
+  - claims_needing_source
+  - assumptions
+  - blocking_questions
+  - review
+  - approved_manifest
+risks:
+- 'Косметичні варіанти: порівняти принципи'
+- 'Редизайн бренду без задачі: перевірити brand refs'
+- 'Мудборд без правил: обов’язкові adaptations'
+---
+playbook_key: creative_ideation
+title: Генерація та відбір ідей
+use_when: Для пошуку механіки, ключової ідеї, гачка або назви. Результат містить ранжування та рекомендацію, а не фінальний
+  макет.
+brief_fields:
+- key: idea_kind
+  type: enum
+  required: true
+  hint: 'Оберіть одне: campaign, activation, hook, naming, mechanic.'
+- key: candidate_count
+  type: number
+  required: true
+  hint: Ціле 6-12; не менше deliverable_count.
+- key: creative_boundaries
+  type: string
+  required: true
+  hint: Що дозволено й заборонено; 1-3000 символів.
+- key: rejected_ideas
+  type: list
+  required: false
+  hint: 0-30 раніше відхилених ідей.
+steps:
+- key: prepare
+  seat: creative
+  executor: claude_session
+  depends_on: []
+  inputs:
+  - brief
+  - knowledge
+  task: Створіть рівно candidate_count різних концепцій. Позначайте інсайти як гіпотези, якщо їх не підтверджує knowledge.
+    Застосуйте ваги brief=0.35, distinctiveness=0.25, feasibility=0.25, evidence=0.15. Використовуйте лише затверджені knowledge
+    для фактів; решту винесіть у claims_needing_source. За браку обов’язкового входу поверніть status=blocked і точні blocking_questions.
+  output_schema:
+    $ref: schemas.json#/$defs/IdeationPreparation
+  quality_checks:
+  - Повнота входів та межі задачі
+  - Версії knowledge й джерела тверджень
+  - Реалістичність запропонованого плану
+- key: build
+  seat: creative
+  executor: claude_session
+  depends_on:
+  - prepare
+  inputs:
+  - brief
+  - knowledge
+  - artifact:prepare
+  task: Оцініть усі вихідні концепції за чотирма критеріями 1-5 та відсортуйте. Оберіть рівно deliverable_count ідей, максимум
+    п’ять; збережіть ID і поясніть відмову від решти. Для кожної запропонуйте дешеву перевірку гіпотези без обіцянок результату.
+    Використовуйте лише затверджені knowledge для фактів; решту винесіть у claims_needing_source. За браку обов’язкового входу
+    поверніть status=blocked і точні blocking_questions.
+  output_schema:
+    $ref: schemas.json#/$defs/IdeationOutput
+  quality_checks:
+  - Кандидати рівно candidate_count зі збереженими ID
+  - Ваги та weighted_score перераховано кодом
+  - selected_ids рівно deliverable_count
+review:
+  seat: reviewer
+  executor: chatgpt
+  criteria:
+  - key: evidence
+    what: Усі фактичні твердження мають чинні knowledge refs; похідні цифри відтворюються.
+    pass_if: score == 5
+  - key: brief_fit
+    what: Досягнута мета, виконані обсяг, канал і acceptance_criteria.
+    pass_if: score >= 4
+  - key: brand
+    what: Бренд, маскот, шрифт, тон і CTA відповідають pinned knowledge; для аналітики збережена термінологія.
+    pass_if: score >= 4
+  - key: execution
+    what: Пакет можна виконати без вигаданих налаштувань, даних, активів і відповідальних.
+    pass_if: score >= 4
+  - key: specialist
+    what: Ідеї різні за механікою, відповідають обмеженням і мають план перевірки.
+    pass_if: score >= 4
+  send_back_to: build
+package:
+  sections:
+  - summary
+  - ranked_candidates
+  - selected_ids
+  - discard_reasons
+  - claims_needing_source
+  - assumptions
+  - blocking_questions
+  - source_uses
+  - review
+handoff:
+  to: human
+  payload:
+  - ranked_candidates
+  - selected_ids
+  - discard_reasons
+  - source_uses
+  - claims_needing_source
+  - assumptions
+  - blocking_questions
+  - review
+  - approved_manifest
+risks:
+- 'Самовідбір слабких ідей: незалежне рев’ю'
+- 'Обіцянка унікальності назви: лише потреба перевірки'
+- 'Повтор відхиленого: перевірка rejected_ideas'
+---
+playbook_key: paid_media_campaign
+title: План Meta Ads або Google Ads
+use_when: Для структури однієї рекламної кампанії, аудиторних гіпотез, оголошень та A/B-перевірок. Один запуск плейбука охоплює
+  одну платформу без фактичного запуску реклами.
+brief_fields:
+- key: platform
+  type: enum
+  required: true
+  hint: 'Оберіть одне: meta, google.'
+- key: offer_knowledge_id
+  type: string
+  required: true
+  hint: ID затвердженої пропозиції.
+- key: geo_knowledge_ids
+  type: list
+  required: true
+  hint: 1-30 ID допустимої географії.
+- key: budget_knowledge_id
+  type: string
+  required: true
+  hint: ID бюджету або затвердження режиму лише відсотків.
+- key: conversion_knowledge_id
+  type: string
+  required: true
+  hint: ID підтвердженого стану відстежування й допустимої оптимізації.
+- key: platform_spec_knowledge_ids
+  type: list
+  required: true
+  hint: 1-20 ID актуальних обмежень платформи.
+- key: landing_knowledge_id
+  type: string
+  required: true
+  hint: ID затвердженої посадкової сторінки й маршруту CTA.
+steps:
+- key: prepare
+  seat: strategist
+  executor: chatgpt
+  depends_on: []
+  inputs:
+  - brief
+  - knowledge
+  task: Оберіть логіку кампанії відповідно до фактичної доступності вимірювання. Розділіть підтверджену географію й гіпотези
+    аудиторій. Побудуйте мінімальну структуру та план бюджету, не вигадуючи розмірів аудиторій. Використовуйте лише затверджені
+    knowledge для фактів; решту винесіть у claims_needing_source. За браку обов’язкового входу поверніть status=blocked і
+    точні blocking_questions.
+  output_schema:
+    $ref: schemas.json#/$defs/Preparation
+  quality_checks:
+  - Повнота входів та межі задачі
+  - Версії knowledge й джерела тверджень
+  - Реалістичність запропонованого плану
+- key: build
+  seat: ads_specialist
+  executor: chatgpt
+  depends_on:
+  - prepare
+  inputs:
+  - brief
+  - knowledge
+  - artifact:prepare
+  task: Складіть structure й рівно deliverable_count оголошень у ads. Для Meta задайте аудиторії та ТЗ на креативи; для Google
+    задайте keywords, negatives і тексти відповідно до knowledge-специфікацій. Експерименти міняють одну змінну та мають метрику,
+    умову рішення й обмеження витрат. Використовуйте лише затверджені knowledge для фактів; решту винесіть у claims_needing_source.
+    За браку обов’язкового входу поверніть status=blocked і точні blocking_questions.
+  output_schema:
+    $ref: schemas.json#/$defs/PaidMediaOutput
+  quality_checks:
+  - Сума budget.share_percent дорівнює 100
+  - Усі ad_set/ad/experiment посилання існують
+  - Оптимізація відповідає conversion knowledge; налаштування платформи підтверджені
+review:
+  seat: reviewer
+  executor: claude_session
+  criteria:
+  - key: evidence
+    what: Усі фактичні твердження мають чинні knowledge refs; похідні цифри відтворюються.
+    pass_if: score == 5
+  - key: brief_fit
+    what: Досягнута мета, виконані обсяг, канал і acceptance_criteria.
+    pass_if: score >= 4
+  - key: brand
+    what: Бренд, маскот, шрифт, тон і CTA відповідають pinned knowledge; для аналітики збережена термінологія.
+    pass_if: score >= 4
+  - key: execution
+    what: Пакет можна виконати без вигаданих налаштувань, даних, активів і відповідальних.
+    pass_if: score >= 4
+  - key: specialist
+    what: Структура не фрагментує бюджет, гіпотези перевірювані, вимірювання реалістичне.
+    pass_if: score >= 4
+  send_back_to: build
+package:
+  sections:
+  - summary
+  - structure
+  - ads
+  - claims_needing_source
+  - assumptions
+  - blocking_questions
+  - source_uses
+  - review
+handoff:
+  to: ads_manager
+  payload:
+  - structure
+  - ads
+  - source_uses
+  - claims_needing_source
+  - assumptions
+  - blocking_questions
+  - review
+  - approved_manifest
+risks:
+- 'Вигаданий CPA чи обсяг аудиторії: claims'
+- 'Непідтверджені конверсії: лише доступні метрики'
+- 'Застарілий таргетинг: blocked без platform knowledge'
+---
+playbook_key: reels_concepts
+title: Сценарії відео, рілсів і промо
+use_when: Для сценаріїв коротких або довших відео, зйомки й монтажу. Зберігає знайомий ключ reels_concepts; нова версія розширює
+  його на промо-ролики.
+brief_fields:
+- key: video_kind
+  type: enum
+  required: true
+  hint: 'Оберіть одне: reel, promo, explainer, testimonial.'
+- key: duration_seconds
+  type: number
+  required: true
+  hint: Число 1-3600.
+- key: format_knowledge_ids
+  type: list
+  required: true
+  hint: 1-12 ID технічних форматів.
+- key: production_constraints
+  type: string
+  required: true
+  hint: Локації, люди, реквізит, час; 1-3000 символів.
+- key: asset_ids
+  type: list
+  required: false
+  hint: 0-30 активів.
+- key: voice_style
+  type: string
+  required: false
+  hint: Побажання до озвучення; до 1000 символів.
+steps:
+- key: prepare
+  seat: strategist
+  executor: claude_session
+  depends_on: []
+  inputs:
+  - brief
+  - knowledge
+  task: Визначте драматургію, гачок і ключову дію глядача. Відберіть знімальні рішення під наявні ресурси. Сформуйте work_items
+    як різні сценарні задуми. Використовуйте лише затверджені knowledge для фактів; решту винесіть у claims_needing_source.
+    За браку обов’язкового входу поверніть status=blocked і точні blocking_questions.
+  output_schema:
+    $ref: schemas.json#/$defs/Preparation
+  quality_checks:
+  - Повнота входів та межі задачі
+  - Версії knowledge й джерела тверджень
+  - Реалістичність запропонованого плану
+- key: build
+  seat: scriptwriter
+  executor: claude_session
+  depends_on:
+  - prepare
+  inputs:
+  - brief
+  - knowledge
+  - artifact:prepare
+  task: Створіть рівно deliverable_count повних сценаріїв. Розкладіть кожен на таймкоди, відеоряд, озвучення, екранний текст,
+    звук і монтаж. Додайте capture_brief, формати, промпти за потреби й перевірку прав; відеофайл тут не створюється. Використовуйте
+    лише затверджені knowledge для фактів; решту винесіть у claims_needing_source. За браку обов’язкового входу поверніть
+    status=blocked і точні blocking_questions.
+  output_schema:
+    $ref: schemas.json#/$defs/ScriptsOutput
+  quality_checks:
+  - Таймкоди послідовні й сумарно дорівнюють тривалості
+  - Текст реально вимовити за відведений час
+  - Усі продуктні твердження й CTA підтверджені
+review:
+  seat: reviewer
+  executor: chatgpt
+  criteria:
+  - key: evidence
+    what: Усі фактичні твердження мають чинні knowledge refs; похідні цифри відтворюються.
+    pass_if: score == 5
+  - key: brief_fit
+    what: Досягнута мета, виконані обсяг, канал і acceptance_criteria.
+    pass_if: score >= 4
+  - key: brand
+    what: Бренд, маскот, шрифт, тон і CTA відповідають pinned knowledge; для аналітики збережена термінологія.
+    pass_if: score >= 4
+  - key: execution
+    what: Пакет можна виконати без вигаданих налаштувань, даних, активів і відповідальних.
+    pass_if: score >= 4
+  - key: specialist
+    what: Гачок працює на задачу, сценарій зрозумілий і здійсненний у заданому продакшні.
+    pass_if: score >= 4
+  send_back_to: build
+package:
+  sections:
+  - summary
+  - scripts
+  - production_checklist
+  - claims_needing_source
+  - assumptions
+  - blocking_questions
+  - source_uses
+  - review
+handoff:
+  to: video_editor
+  payload:
+  - scripts
+  - production_checklist
+  - source_uses
+  - claims_needing_source
+  - assumptions
+  - blocking_questions
+  - review
+  - approved_manifest
+risks:
+- 'Незнімальний задум: constraints check'
+- 'Чужі треки: rights_checks'
+- 'Красива ідея без сценарію: обов’язкові shots'
+---
+playbook_key: outdoor_print_pack
+title: Зовнішня реклама й поліграфія
+use_when: Для білбордів, сітілайтів, флаєрів та А4. Один запуск має один тип носія та конкретну технічну специфікацію постачальника.
+brief_fields:
+- key: medium
+  type: enum
+  required: true
+  hint: 'Оберіть одне: billboard, citylight, flyer, a4, other.'
+- key: supplier_spec_knowledge_id
+  type: string
+  required: true
+  hint: ID специфікації друкарні або оператора площини.
+- key: placement_knowledge_ids
+  type: list
+  required: true
+  hint: 1-30 ID адрес/контексту показу або розповсюдження.
+- key: cta_route_knowledge_id
+  type: string
+  required: true
+  hint: ID затвердженого маршруту звернення.
+- key: mandatory_copy
+  type: list
+  required: false
+  hint: 0-20 обов’язкових рядків; факти лише з knowledge.
+steps:
+- key: prepare
+  seat: creative_director
+  executor: claude_session
+  depends_on: []
+  inputs:
+  - brief
+  - knowledge
+  task: Визначте одну головну думку й дію після контакту з носієм. Врахуйте відстань, швидкість перегляду або спосіб роздачі.
+    Перевірте техвимоги й затверджений маршрут звернення. Використовуйте лише затверджені knowledge для фактів; решту винесіть
+    у claims_needing_source. За браку обов’язкового входу поверніть status=blocked і точні blocking_questions.
+  output_schema:
+    $ref: schemas.json#/$defs/Preparation
+  quality_checks:
+  - Повнота входів та межі задачі
+  - Версії knowledge й джерела тверджень
+  - Реалістичність запропонованого плану
+- key: build
+  seat: print_designer
+  executor: claude_session
+  depends_on:
+  - prepare
+  inputs:
+  - brief
+  - knowledge
+  - artifact:prepare
+  task: Видайте рівно deliverable_count специфікацій макетів. Додайте композицію, остаточні тексти й параметри друку лише
+    з knowledge постачальника. Для дорожнього носія QR не може бути єдиним способом звернення; додайте план перевірки читабельності
+    й контроль друкованого proof. Використовуйте лише затверджені knowledge для фактів; решту винесіть у claims_needing_source.
+    За браку обов’язкового входу поверніть status=blocked і точні blocking_questions.
+  output_schema:
+    $ref: schemas.json#/$defs/PrintOutput
+  quality_checks:
+  - Trim/bleed/safe margin/profile/DPI відповідають supplier knowledge
+  - CTA читабельний у контексті показу
+  - Локальна обіцянка відповідає підтвердженому покриттю
+review:
+  seat: reviewer
+  executor: chatgpt
+  criteria:
+  - key: evidence
+    what: Усі фактичні твердження мають чинні knowledge refs; похідні цифри відтворюються.
+    pass_if: score == 5
+  - key: brief_fit
+    what: Досягнута мета, виконані обсяг, канал і acceptance_criteria.
+    pass_if: score >= 4
+  - key: brand
+    what: Бренд, маскот, шрифт, тон і CTA відповідають pinned knowledge; для аналітики збережена термінологія.
+    pass_if: score >= 4
+  - key: execution
+    what: Пакет можна виконати без вигаданих налаштувань, даних, активів і відповідальних.
+    pass_if: score >= 4
+  - key: specialist
+    what: Макет читається в реальних умовах, техвимоги й маршрут відповіді перевірювані.
+    pass_if: score >= 4
+  send_back_to: build
+package:
+  sections:
+  - summary
+  - layouts
+  - supplier_questions
+  - claims_needing_source
+  - assumptions
+  - blocking_questions
+  - source_uses
+  - review
+handoff:
+  to: print
+  payload:
+  - layouts
+  - supplier_questions
+  - source_uses
+  - claims_needing_source
+  - assumptions
+  - blocking_questions
+  - review
+  - approved_manifest
+risks:
+- 'Шаблонні 3 мм чи 300 DPI: лише supplier knowledge'
+- 'QR для водія: не єдиний CTA'
+- 'Гіперлокальна обіцянка без покриття: blocked'
+---
+playbook_key: offer_launch
+title: Запуск тарифу або акції
+use_when: Для узгодженого запуску пропозиції на сайті, у рекламі, SMM та продажах. Формує єдиний пакет меседжів і робіт без
+  автоматичного створення дочірніх плейбуків.
+brief_fields:
+- key: offer_knowledge_id
+  type: string
+  required: true
+  hint: ID повних затверджених умов.
+- key: launch_channels
+  type: list
+  required: true
+  hint: 1-12 каналів.
+- key: launch_at
+  type: string
+  required: true
+  hint: ISO 8601 із часовим поясом.
+- key: readiness_knowledge_ids
+  type: list
+  required: true
+  hint: 1-20 ID стану сайту, продажів і технічної готовності.
+- key: previous_offer_knowledge_id
+  type: string
+  required: false
+  hint: ID попередніх умов для заміни.
+steps:
+- key: prepare
+  seat: strategist
+  executor: chatgpt
+  depends_on: []
+  inputs:
+  - brief
+  - knowledge
+  task: Перевірте узгодженість умов, географії, строків і обмежень. Визначте, де треба оновити старі повідомлення та що блокує
+    запуск. Сформуйте work_items за каналами з відповідальними ролями. Використовуйте лише затверджені knowledge для фактів;
+    решту винесіть у claims_needing_source. За браку обов’язкового входу поверніть status=blocked і точні blocking_questions.
+  output_schema:
+    $ref: schemas.json#/$defs/Preparation
+  quality_checks:
+  - Повнота входів та межі задачі
+  - Версії knowledge й джерела тверджень
+  - Реалістичність запропонованого плану
+- key: build
+  seat: orchestrator
+  executor: chatgpt
+  depends_on:
+  - prepare
+  inputs:
+  - brief
+  - knowledge
+  - artifact:prepare
+  task: Підготуйте рівно deliverable_count комунікаційних одиниць для launch_channels. Додайте узгоджені тексти, FAQ продажам
+    і ТЗ на продакшн. Складіть tasks із залежностями, строками, умовами готовності та відкату; не створюйте нових кроків рушія.
+    Використовуйте лише затверджені knowledge для фактів; решту винесіть у claims_needing_source. За браку обов’язкового входу
+    поверніть status=blocked і точні blocking_questions.
+  output_schema:
+    $ref: schemas.json#/$defs/LaunchOutput
+  quality_checks:
+  - Умови однакові в усіх units і FAQ
+  - tasks утворюють DAG і мають ролі/строки
+  - Є оновлення старих матеріалів і rollback
+review:
+  seat: reviewer
+  executor: claude_session
+  criteria:
+  - key: evidence
+    what: Усі фактичні твердження мають чинні knowledge refs; похідні цифри відтворюються.
+    pass_if: score == 5
+  - key: brief_fit
+    what: Досягнута мета, виконані обсяг, канал і acceptance_criteria.
+    pass_if: score >= 4
+  - key: brand
+    what: Бренд, маскот, шрифт, тон і CTA відповідають pinned knowledge; для аналітики збережена термінологія.
+    pass_if: score >= 4
+  - key: execution
+    what: Пакет можна виконати без вигаданих налаштувань, даних, активів і відповідальних.
+    pass_if: score >= 4
+  - key: specialist
+    what: Усі канали й продажі готові до узгодженого старту, умови не спотворені.
+    pass_if: score >= 4
+  send_back_to: build
+package:
+  sections:
+  - summary
+  - units
+  - tasks
+  - measurement
+  - readiness_checklist
+  - claims_needing_source
+  - assumptions
+  - blocking_questions
+  - source_uses
+  - review
+handoff:
+  to: human
+  payload:
+  - units
+  - tasks
+  - measurement
+  - readiness_checklist
+  - source_uses
+  - claims_needing_source
+  - assumptions
+  - blocking_questions
+  - review
+  - approved_manifest
+risks:
+- 'Запуск до готовності сайту: readiness gate'
+- 'Різні умови в каналах: перевірка offer refs'
+- 'План видається за виконаний запуск: явний handoff'
+---
+playbook_key: campaign_analysis
+title: Аналіз кампанії та рішення CMO
+use_when: Для звіту за підтвердженими результатами, порівняння періодів і плану дій. Відсутність даних відображається явно,
+  результати не домислюються.
+brief_fields:
+- key: dataset_knowledge_ids
+  type: list
+  required: true
+  hint: 1-20 ID затверджених знімків із періодом, валютою й grain.
+- key: period
+  type: string
+  required: true
+  hint: Межі аналізованого періоду; 1-300 символів.
+- key: comparison_period
+  type: string
+  required: false
+  hint: Межі періоду порівняння.
+- key: metric_keys
+  type: list
+  required: true
+  hint: 1-30 назв метрик.
+- key: decision_question
+  type: string
+  required: true
+  hint: Яке рішення має підтримати звіт; 1-2000 символів.
+steps:
+- key: prepare
+  seat: performance_analyst
+  executor: chatgpt
+  depends_on: []
+  inputs:
+  - brief
+  - knowledge
+  task: Перевірте свіжість, повноту, зерно, дублікати, валюту та зіставність даних. Визначте, які метрики можна чесно порахувати
+    й порівняти. Запишіть план аналізу та прогалини без припущених конверсій. Використовуйте лише затверджені knowledge для
+    фактів; решту винесіть у claims_needing_source. За браку обов’язкового входу поверніть status=blocked і точні blocking_questions.
+  output_schema:
+    $ref: schemas.json#/$defs/Preparation
+  quality_checks:
+  - Повнота входів та межі задачі
+  - Версії knowledge й джерела тверджень
+  - Реалістичність запропонованого плану
+- key: build
+  seat: performance_analyst
+  executor: chatgpt
+  depends_on:
+  - prepare
+  inputs:
+  - brief
+  - knowledge
+  - artifact:prepare
+  task: Сформуйте рівно deliverable_count висновків findings і пріоритетні actions. Для кожної похідної цифри додайте calculation
+    із формулою, підстановкою, knowledge refs та обмеженнями. За відсутності знаменника поверніть null із причиною; причинні
+    пояснення без доказів класифікуйте як hypotheses. Використовуйте лише затверджені knowledge для фактів; решту винесіть
+    у claims_needing_source. За браку обов’язкового входу поверніть status=blocked і точні blocking_questions.
+  output_schema:
+    $ref: schemas.json#/$defs/AnalysisOutput
+  quality_checks:
+  - Формули незалежно перераховані кодом
+  - CTR/CPC/CPA мають коректні знаменники; нуль не підміняє відсутні дані
+  - Періоди, attribution і валюти зіставні
+review:
+  seat: reviewer
+  executor: claude_session
+  criteria:
+  - key: evidence
+    what: Усі фактичні твердження мають чинні knowledge refs; похідні цифри відтворюються.
+    pass_if: score == 5
+  - key: brief_fit
+    what: Досягнута мета, виконані обсяг, канал і acceptance_criteria.
+    pass_if: score >= 4
+  - key: brand
+    what: Бренд, маскот, шрифт, тон і CTA відповідають pinned knowledge; для аналітики збережена термінологія.
+    pass_if: score >= 4
+  - key: execution
+    what: Пакет можна виконати без вигаданих налаштувань, даних, активів і відповідальних.
+    pass_if: score >= 4
+  - key: specialist
+    what: Розрахунки відтворюються, причинність не перебільшена, дії випливають із висновків.
+    pass_if: score >= 4
+  send_back_to: build
+package:
+  sections:
+  - summary
+  - findings
+  - calculations
+  - actions
+  - data_quality
+  - claims_needing_source
+  - assumptions
+  - blocking_questions
+  - source_uses
+  - review
+handoff:
+  to: human
+  payload:
+  - findings
+  - calculations
+  - actions
+  - data_quality
+  - source_uses
+  - claims_needing_source
+  - assumptions
+  - blocking_questions
+  - review
+  - approved_manifest
+risks:
+- 'Немає лідів, але є CPA: блокування розрахунку'
+- 'Змішані періоди/валюти: data_quality'
+- 'Кореляція названа причиною: hypothesis'
+---
+playbook_key: competitor_analysis
+title: Конкурентний аналіз
+use_when: Для зіставлення операторів, пропозицій і комунікацій на визначеній території. Нові веб-знахідки є кандидатами на
+  knowledge, доки власник не підтвердить їх.
+brief_fields:
+- key: competitors
+  type: list
+  required: true
+  hint: 1-10 ID або назв конкурентів.
+- key: dimensions
+  type: list
+  required: true
+  hint: 1-10 критеріїв порівняння.
+- key: geo_knowledge_ids
+  type: list
+  required: true
+  hint: 1-20 ID територій порівняння.
+- key: source_knowledge_ids
+  type: list
+  required: true
+  hint: 1-30 ID затверджених конкурентних даних із датами.
+- key: research_mode
+  type: enum
+  required: true
+  hint: 'Оберіть одне: knowledge_only, candidate_collection.'
+steps:
+- key: prepare
+  seat: research_analyst
+  executor: chatgpt
+  depends_on: []
+  inputs:
+  - brief
+  - knowledge
+  task: Побудуйте матрицю конкурентів і критеріїв. Перевірте, чи зіставні території, умови й дати спостережень. У режимі candidate_collection
+    збирайте доступні публічні джерела окремо; без браузерного доступу не імітуйте дослідження. Використовуйте лише затверджені
+    knowledge для фактів; решту винесіть у claims_needing_source. За браку обов’язкового входу поверніть status=blocked і
+    точні blocking_questions.
+  output_schema:
+    $ref: schemas.json#/$defs/Preparation
+  quality_checks:
+  - Повнота входів та межі задачі
+  - Версії knowledge й джерела тверджень
+  - Реалістичність запропонованого плану
+- key: build
+  seat: research_analyst
+  executor: chatgpt
+  depends_on:
+  - prepare
+  inputs:
+  - brief
+  - knowledge
+  - artifact:prepare
+  task: Заповніть повну матрицю rows, де невідоме має null і status=unavailable. Дайте рівно deliverable_count findings та
+    пов’язані actions. Нові непогоджені факти збережіть лише в research_candidates і claims_needing_source; вони не є підставою
+    для підтверджених висновків. Використовуйте лише затверджені knowledge для фактів; решту винесіть у claims_needing_source.
+    За браку обов’язкового входу поверніть status=blocked і точні blocking_questions.
+  output_schema:
+    $ref: schemas.json#/$defs/CompetitorOutput
+  quality_checks:
+  - rows дорівнює competitors × dimensions без дублів
+  - verified rows мають knowledge refs і observed_at
+  - Непогоджені web-кандидати відокремлені від фактичної матриці
+review:
+  seat: reviewer
+  executor: claude_session
+  criteria:
+  - key: evidence
+    what: Усі фактичні твердження мають чинні knowledge refs; похідні цифри відтворюються.
+    pass_if: score == 5
+  - key: brief_fit
+    what: Досягнута мета, виконані обсяг, канал і acceptance_criteria.
+    pass_if: score >= 4
+  - key: brand
+    what: Бренд, маскот, шрифт, тон і CTA відповідають pinned knowledge; для аналітики збережена термінологія.
+    pass_if: score >= 4
+  - key: execution
+    what: Пакет можна виконати без вигаданих налаштувань, даних, активів і відповідальних.
+    pass_if: score >= 4
+  - key: specialist
+    what: Порівняння зіставне, свіже за knowledge-правилами й не підміняє невідоме оцінкою.
+    pass_if: score >= 4
+  send_back_to: build
+package:
+  sections:
+  - summary
+  - rows
+  - findings
+  - actions
+  - research_candidates
+  - claims_needing_source
+  - assumptions
+  - blocking_questions
+  - source_uses
+  - review
+handoff:
+  to: human
+  payload:
+  - rows
+  - findings
+  - actions
+  - research_candidates
+  - source_uses
+  - claims_needing_source
+  - assumptions
+  - blocking_questions
+  - review
+  - approved_manifest
+risks:
+- 'Ціна без умов і дати: unavailable'
+- 'Національна пропозиція приписана локальній адресі: geo check'
+- 'Веб-пошук автоматично став knowledge: заборонено'
+---
+playbook_key: owned_media_copy
+title: Сайт, email, SMS, PR та сервісні тексти
+use_when: Для текстів посадкових сторінок, листів, SMS, новин, IVR і FAQ. Один запуск охоплює один вид матеріалу та готує
+  його до людської публікації.
+brief_fields:
+- key: copy_kind
+  type: enum
+  required: true
+  hint: 'Оберіть одне: website, landing, email, sms, pr, ivr, faq.'
+- key: message_knowledge_ids
+  type: list
+  required: true
+  hint: 1-30 ID фактів і умов повідомлення.
+- key: destination_knowledge_id
+  type: string
+  required: false
+  hint: ID затвердженого маршруту CTA.
+- key: delivery_spec_knowledge_id
+  type: string
+  required: true
+  hint: ID техлімітів, вимог згоди/відписки або редакційних правил.
+- key: publication_at
+  type: string
+  required: false
+  hint: ISO 8601 із часовим поясом.
+- key: mandatory_sections
+  type: list
+  required: false
+  hint: 0-30 обов’язкових блоків.
+steps:
+- key: prepare
+  seat: strategist
+  executor: claude_session
+  depends_on: []
+  inputs:
+  - brief
+  - knowledge
+  task: Визначте одну головну дію читача або слухача та структуру матеріалу. Перевірте, які факти, цитати, дати й вимоги каналу
+    підтверджені. Для сервісних повідомлень відокремте підтверджений стан від прогнозів. Використовуйте лише затверджені knowledge
+    для фактів; решту винесіть у claims_needing_source. За браку обов’язкового входу поверніть status=blocked і точні blocking_questions.
+  output_schema:
+    $ref: schemas.json#/$defs/Preparation
+  quality_checks:
+  - Повнота входів та межі задачі
+  - Версії knowledge й джерела тверджень
+  - Реалістичність запропонованого плану
+- key: build
+  seat: copywriter
+  executor: claude_session
+  depends_on:
+  - prepare
+  inputs:
+  - brief
+  - knowledge
+  - artifact:prepare
+  task: Напишіть рівно deliverable_count одиниць обраного copy_kind. Додайте відповідні subject/preheader, секції, метадані
+    й перевірки доставки; зайві поля заповніть null або порожнім масивом. У SMS врахуйте кодування й ліміт із knowledge, у
+    PR не вигадуйте цитат, у IVR не вигадуйте строків відновлення. Використовуйте лише затверджені knowledge для фактів; решту
+    винесіть у claims_needing_source. За браку обов’язкового входу поверніть status=blocked і точні blocking_questions.
+  output_schema:
+    $ref: schemas.json#/$defs/OwnedCopyOutput
+  quality_checks:
+  - Тип усіх units дорівнює copy_kind
+  - Канал-специфічні обмеження перевірені кодом або людиною
+  - Цитати, обіцянки, CTA й сервісні строки підтверджені
+review:
+  seat: reviewer
+  executor: chatgpt
+  criteria:
+  - key: evidence
+    what: Усі фактичні твердження мають чинні knowledge refs; похідні цифри відтворюються.
+    pass_if: score == 5
+  - key: brief_fit
+    what: Досягнута мета, виконані обсяг, канал і acceptance_criteria.
+    pass_if: score >= 4
+  - key: brand
+    what: Бренд, маскот, шрифт, тон і CTA відповідають pinned knowledge; для аналітики збережена термінологія.
+    pass_if: score >= 4
+  - key: execution
+    what: Пакет можна виконати без вигаданих налаштувань, даних, активів і відповідальних.
+    pass_if: score >= 4
+  - key: specialist
+    what: Структура відповідає каналу, головна дія зрозуміла, текст готовий до передачі редактору.
+    pass_if: score >= 4
+  send_back_to: build
+package:
+  sections:
+  - summary
+  - units
+  - delivery_checklist
+  - claims_needing_source
+  - assumptions
+  - blocking_questions
+  - source_uses
+  - review
+handoff:
+  to: human
+  payload:
+  - units
+  - delivery_checklist
+  - source_uses
+  - claims_needing_source
+  - assumptions
+  - blocking_questions
+  - review
+  - approved_manifest
+risks:
+- 'Вигадана цитата: source gate'
+- 'SMS дорожчає через довжину: delivery check'
+- 'Непідтверджений час відновлення: виключити або blocked'

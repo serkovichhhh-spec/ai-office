@@ -33,7 +33,7 @@ export class AnthropicProvider implements AiProvider {
   async generate<T>(req: GenerateRequest<T>): Promise<GenerateResult<T>> {
     const model = this.cfg.models[req.tier];
     const fetchImpl = this.cfg.fetchImpl ?? fetch;
-    const inputSchema = z.toJSONSchema(req.schema, { target: "draft-7" }) as Record<string, unknown>;
+    const inputSchema = { ...(req.jsonSchema ?? (z.toJSONSchema(req.schema, { target: "draft-7" }) as Record<string, unknown>)) };
     delete inputSchema.$schema;
 
     let res: Response;

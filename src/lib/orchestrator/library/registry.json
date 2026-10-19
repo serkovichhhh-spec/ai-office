@@ -1,0 +1,113 @@
+{
+ "library_version": "2026.10.19-v1",
+ "playbooks": [
+  {
+   "playbook_key": "smm_content_plan",
+   "priority": "P2",
+   "version": 1,
+   "main_output": "items",
+   "deliverable_count_max": 100,
+   "author_executor": "chatgpt",
+   "review_executor": "claude_session"
+  },
+  {
+   "playbook_key": "social_content_pack",
+   "priority": "P2",
+   "version": 1,
+   "main_output": "units",
+   "deliverable_count_max": 30,
+   "author_executor": "claude_session",
+   "review_executor": "chatgpt"
+  },
+  {
+   "playbook_key": "graphic_design_pack",
+   "priority": "P1",
+   "version": 1,
+   "main_output": "creatives",
+   "deliverable_count_max": 30,
+   "author_executor": "claude_session",
+   "review_executor": "chatgpt"
+  },
+  {
+   "playbook_key": "campaign_art_direction",
+   "priority": "P2",
+   "version": 1,
+   "main_output": "directions",
+   "deliverable_count_max": 3,
+   "author_executor": "claude_session",
+   "review_executor": "chatgpt"
+  },
+  {
+   "playbook_key": "creative_ideation",
+   "priority": "P2",
+   "version": 1,
+   "main_output": "selected_ids",
+   "deliverable_count_max": 5,
+   "author_executor": "claude_session",
+   "review_executor": "chatgpt"
+  },
+  {
+   "playbook_key": "paid_media_campaign",
+   "priority": "P1",
+   "version": 1,
+   "main_output": "ads",
+   "deliverable_count_max": 30,
+   "author_executor": "chatgpt",
+   "review_executor": "claude_session"
+  },
+  {
+   "playbook_key": "reels_concepts",
+   "priority": "P1",
+   "version": 2,
+   "main_output": "scripts",
+   "deliverable_count_max": 10,
+   "author_executor": "claude_session",
+   "review_executor": "chatgpt"
+  },
+  {
+   "playbook_key": "outdoor_print_pack",
+   "priority": "P1",
+   "version": 1,
+   "main_output": "layouts",
+   "deliverable_count_max": 10,
+   "author_executor": "claude_session",
+   "review_executor": "chatgpt"
+  },
+  {
+   "playbook_key": "offer_launch",
+   "priority": "P1",
+   "version": 1,
+   "main_output": "units",
+   "deliverable_count_max": 20,
+   "author_executor": "chatgpt",
+   "review_executor": "claude_session"
+  },
+  {
+   "playbook_key": "campaign_analysis",
+   "priority": "P2",
+   "version": 1,
+   "main_output": "findings",
+   "deliverable_count_max": 30,
+   "author_executor": "chatgpt",
+   "review_executor": "claude_session"
+  },
+  {
+   "playbook_key": "competitor_analysis",
+   "priority": "P3",
+   "version": 1,
+   "main_output": "findings",
+   "deliverable_count_max": 30,
+   "author_executor": "chatgpt",
+   "review_executor": "claude_session"
+  },
+  {
+   "playbook_key": "owned_media_copy",
+   "priority": "P2",
+   "version": 1,
+   "main_output": "units",
+   "deliverable_count_max": 30,
+   "author_executor": "claude_session",
+   "review_executor": "chatgpt"
+  }
+ ]
+}

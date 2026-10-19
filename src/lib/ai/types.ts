@@ -10,6 +10,11 @@ export interface GenerateRequest<T> {
   /** Output contract; every provider's output is validated against it before it is stored. */
   schema: z.ZodType<T>;
   schemaName: string;
+  /**
+   * Explicit JSON Schema for the output, when `schema` cannot describe itself
+   * (library contracts validated by Ajv). Providers prefer it over z.toJSONSchema(schema).
+   */
+  jsonSchema?: Record<string, unknown>;
   tier: ModelTier;
   maxOutputTokens?: number;
   /**

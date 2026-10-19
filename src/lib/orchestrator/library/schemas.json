@@ -1,0 +1,4167 @@
+{
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "$id": "https://ai-office.invalid/schemas.json",
+ "$defs": {
+  "KnowledgeRef": {
+   "type": "object",
+   "additionalProperties": false,
+   "required": [
+    "record_id",
+    "version",
+    "pointer"
+   ],
+   "properties": {
+    "record_id": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 100
+    },
+    "version": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 100
+    },
+    "pointer": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 300
+    }
+   }
+  },
+  "SourceUse": {
+   "type": "object",
+   "additionalProperties": false,
+   "required": [
+    "output_pointer",
+    "refs",
+    "derivation"
+   ],
+   "properties": {
+    "output_pointer": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 400
+    },
+    "refs": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/KnowledgeRef"
+     },
+     "minItems": 1,
+     "maxItems": 10
+    },
+    "derivation": {
+     "anyOf": [
+      {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 1000
+      },
+      {
+       "type": "null"
+      }
+     ]
+    }
+   }
+  },
+  "Claim": {
+   "type": "object",
+   "additionalProperties": false,
+   "required": [
+    "id",
+    "text",
+    "needed_evidence",
+    "disposition",
+    "affected_pointer"
+   ],
+   "properties": {
+    "id": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 80
+    },
+    "text": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 1500
+    },
+    "needed_evidence": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 1000
+    },
+    "disposition": {
+     "type": "string",
+     "enum": [
+      "excluded",
+      "placeholder"
+     ]
+    },
+    "affected_pointer": {
+     "anyOf": [
+      {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 400
+      },
+      {
+       "type": "null"
+      }
+     ]
+    }
+   }
+  },
+  "Hypothesis": {
+   "type": "object",
+   "additionalProperties": false,
+   "required": [
+    "id",
+    "statement",
+    "validation"
+   ],
+   "properties": {
+    "id": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 80
+    },
+    "statement": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 1500
+    },
+    "validation": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 1000
+    }
+   }
+  },
+  "WorkItem": {
+   "type": "object",
+   "additionalProperties": false,
+   "required": [
+    "id",
+    "title",
+    "action",
+    "rationale",
+    "audience",
+    "dependencies",
+    "source_refs"
+   ],
+   "properties": {
+    "id": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 80
+    },
+    "title": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 160
+    },
+    "action": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 2000
+    },
+    "rationale": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 1500
+    },
+    "audience": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 1000
+    },
+    "dependencies": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1000
+     },
+     "minItems": 0,
+     "maxItems": 20
+    },
+    "source_refs": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/KnowledgeRef"
+     },
+     "minItems": 0,
+     "maxItems": 20
+    }
+   }
+  },
+  "CopyVariant": {
+   "type": "object",
+   "additionalProperties": false,
+   "required": [
+    "id",
+    "placement",
+    "headline",
+    "body",
+    "cta",
+    "destination",
+    "source_refs"
+   ],
+   "properties": {
+    "id": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 80
+    },
+    "placement": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 120
+    },
+    "headline": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 180
+    },
+    "body": {
+     "type": "string",
+     "minLength": 0,
+     "maxLength": 12000
+    },
+    "cta": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 200
+    },
+    "destination": {
+     "anyOf": [
+      {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 2048
+      },
+      {
+       "type": "null"
+      }
+     ]
+    },
+    "source_refs": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/KnowledgeRef"
+     },
+     "minItems": 0,
+     "maxItems": 20
+    }
+   }
+  },
+  "Concept": {
+   "type": "object",
+   "additionalProperties": false,
+   "required": [
+    "id",
+    "title",
+    "insight_hypothesis",
+    "idea",
+    "hook",
+    "message",
+    "visual_direction",
+    "rationale",
+    "source_refs"
+   ],
+   "properties": {
+    "id": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 80
+    },
+    "title": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 160
+    },
+    "insight_hypothesis": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 1200
+    },
+    "idea": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 2000
+    },
+    "hook": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 400
+    },
+    "message": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 700
+    },
+    "visual_direction": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 2000
+    },
+    "rationale": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 1200
+    },
+    "source_refs": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/KnowledgeRef"
+     },
+     "minItems": 0,
+     "maxItems": 20
+    }
+   }
+  },
+  "FormatSpec": {
+   "type": "object",
+   "additionalProperties": false,
+   "required": [
+    "id",
+    "channel",
+    "placement",
+    "width",
+    "height",
+    "unit",
+    "aspect_ratio",
+    "duration_seconds",
+    "safe_area",
+    "export_spec",
+    "source_refs"
+   ],
+   "properties": {
+    "id": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 80
+    },
+    "channel": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 120
+    },
+    "placement": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 120
+    },
+    "width": {
+     "anyOf": [
+      {
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 100000
+      },
+      {
+       "type": "null"
+      }
+     ]
+    },
+    "height": {
+     "anyOf": [
+      {
+       "type": "integer",
+       "minimum": 1,
+       "maximum": 100000
+      },
+      {
+       "type": "null"
+      }
+     ]
+    },
+    "unit": {
+     "type": "string",
+     "enum": [
+      "px",
+      "mm"
+     ]
+    },
+    "aspect_ratio": {
+     "anyOf": [
+      {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 40
+      },
+      {
+       "type": "null"
+      }
+     ]
+    },
+    "duration_seconds": {
+     "anyOf": [
+      {
+       "type": "number",
+       "minimum": 0.1,
+       "maximum": 3600
+      },
+      {
+       "type": "null"
+      }
+     ]
+    },
+    "safe_area": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 1000
+    },
+    "export_spec": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 1500
+    },
+    "source_refs": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/KnowledgeRef"
+     },
+     "minItems": 0,
+     "maxItems": 20
+    }
+   }
+  },
+  "AssetUse": {
+   "type": "object",
+   "additionalProperties": false,
+   "required": [
+    "asset_id",
+    "version",
+    "purpose",
+    "rights_knowledge_refs"
+   ],
+   "properties": {
+    "asset_id": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 100
+    },
+    "version": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 100
+    },
+    "purpose": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 500
+    },
+    "rights_knowledge_refs": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/KnowledgeRef"
+     },
+     "minItems": 1,
+     "maxItems": 10
+    }
+   }
+  },
+  "GenerationPrompt": {
+   "type": "object",
+   "additionalProperties": false,
+   "required": [
+    "id",
+    "purpose",
+    "prompt",
+    "avoid",
+    "reference_assets",
+    "text_overlay_instruction"
+   ],
+   "properties": {
+    "id": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 80
+    },
+    "purpose": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 200
+    },
+    "prompt": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 6000
+    },
+    "avoid": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 2000
+    },
+    "reference_assets": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/AssetUse"
+     },
+     "minItems": 0,
+     "maxItems": 20
+    },
+    "text_overlay_instruction": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 1000
+    }
+   }
+  },
+  "DesignBrief": {
+   "type": "object",
+   "additionalProperties": false,
+   "required": [
+    "id",
+    "concept",
+    "composition",
+    "hierarchy",
+    "copy",
+    "brand_knowledge_refs",
+    "asset_uses",
+    "formats",
+    "generation_prompts",
+    "accessibility_checks",
+    "production_checks"
+   ],
+   "properties": {
+    "id": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 80
+    },
+    "concept": {
+     "$ref": "#/$defs/Concept"
+    },
+    "composition": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 3000
+    },
+    "hierarchy": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 600
+     },
+     "minItems": 1,
+     "maxItems": 12
+    },
+    "copy": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/CopyVariant"
+     },
+     "minItems": 1,
+     "maxItems": 20
+    },
+    "brand_knowledge_refs": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/KnowledgeRef"
+     },
+     "minItems": 1,
+     "maxItems": 20
+    },
+    "asset_uses": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/AssetUse"
+     },
+     "minItems": 0,
+     "maxItems": 20
+    },
+    "formats": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/FormatSpec"
+     },
+     "minItems": 1,
+     "maxItems": 12
+    },
+    "generation_prompts": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/GenerationPrompt"
+     },
+     "minItems": 0,
+     "maxItems": 8
+    },
+    "accessibility_checks": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 800
+     },
+     "minItems": 1,
+     "maxItems": 20
+    },
+    "production_checks": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 800
+     },
+     "minItems": 1,
+     "maxItems": 30
+    }
+   }
+  },
+  "CreativeSpec": {
+   "type": "object",
+   "additionalProperties": false,
+   "required": [
+    "id",
+    "design",
+    "adaptation_rules",
+    "file_naming"
+   ],
+   "properties": {
+    "id": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 80
+    },
+    "design": {
+     "$ref": "#/$defs/DesignBrief"
+    },
+    "adaptation_rules": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 800
+     },
+     "minItems": 1,
+     "maxItems": 20
+    },
+    "file_naming": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 300
+    }
+   }
+  },
+  "MeasurementPlan": {
+   "type": "object",
+   "additionalProperties": false,
+   "required": [
+    "objective",
+    "primary_metric",
+    "definition",
+    "approved_target",
+    "target_knowledge_refs",
+    "collection",
+    "attribution_limitations",
+    "decision_rule"
+   ],
+   "properties": {
+    "objective": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 1000
+    },
+    "primary_metric": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 200
+    },
+    "definition": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 1500
+    },
+    "approved_target": {
+     "anyOf": [
+      {
+       "type": "number",
+       "minimum": 0,
+       "maximum": 1000000000
+      },
+      {
+       "type": "null"
+      }
+     ]
+    },
+    "target_knowledge_refs": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/KnowledgeRef"
+     },
+     "minItems": 0,
+     "maxItems": 10
+    },
+    "collection": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 1500
+    },
+    "attribution_limitations": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1000
+     },
+     "minItems": 1,
+     "maxItems": 20
+    },
+    "decision_rule": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 1500
+    }
+   }
+  },
+  "ContentPlanItem": {
+   "type": "object",
+   "additionalProperties": false,
+   "required": [
+    "id",
+    "scheduled_at",
+    "channel",
+    "format",
+    "pillar",
+    "topic",
+    "goal",
+    "hook_hypothesis",
+    "cta",
+    "production_needs",
+    "measurement",
+    "source_refs"
+   ],
+   "properties": {
+    "id": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 80
+    },
+    "scheduled_at": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 80
+    },
+    "channel": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 120
+    },
+    "format": {
+     "type": "string",
+     "enum": [
+      "post",
+      "stories",
+      "reel",
+      "video",
+      "carousel",
+      "live"
+     ]
+    },
+    "pillar": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 150
+    },
+    "topic": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 500
+    },
+    "goal": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 700
+    },
+    "hook_hypothesis": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 700
+    },
+    "cta": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 200
+    },
+    "production_needs": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1000
+     },
+     "minItems": 0,
+     "maxItems": 20
+    },
+    "measurement": {
+     "$ref": "#/$defs/MeasurementPlan"
+    },
+    "source_refs": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/KnowledgeRef"
+     },
+     "minItems": 0,
+     "maxItems": 20
+    }
+   }
+  },
+  "StoryFrame": {
+   "type": "object",
+   "additionalProperties": false,
+   "required": [
+    "order",
+    "on_screen_text",
+    "visual",
+    "interaction",
+    "duration_seconds"
+   ],
+   "properties": {
+    "order": {
+     "type": "integer",
+     "minimum": 1,
+     "maximum": 30
+    },
+    "on_screen_text": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 500
+    },
+    "visual": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 1500
+    },
+    "interaction": {
+     "anyOf": [
+      {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 500
+      },
+      {
+       "type": "null"
+      }
+     ]
+    },
+    "duration_seconds": {
+     "type": "number",
+     "minimum": 0.1,
+     "maximum": 60
+    }
+   }
+  },
+  "Shot": {
+   "type": "object",
+   "additionalProperties": false,
+   "required": [
+    "order",
+    "start_seconds",
+    "end_seconds",
+    "visual",
+    "voiceover",
+    "on_screen_text",
+    "audio",
+    "edit_notes",
+    "source_refs"
+   ],
+   "properties": {
+    "order": {
+     "type": "integer",
+     "minimum": 1,
+     "maximum": 500
+    },
+    "start_seconds": {
+     "type": "number",
+     "minimum": 0,
+     "maximum": 3600
+    },
+    "end_seconds": {
+     "type": "number",
+     "minimum": 0.1,
+     "maximum": 3600
+    },
+    "visual": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 2000
+    },
+    "voiceover": {
+     "type": "string",
+     "minLength": 0,
+     "maxLength": 2000
+    },
+    "on_screen_text": {
+     "type": "string",
+     "minLength": 0,
+     "maxLength": 1000
+    },
+    "audio": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 1000
+    },
+    "edit_notes": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 1500
+    },
+    "source_refs": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/KnowledgeRef"
+     },
+     "minItems": 0,
+     "maxItems": 20
+    }
+   }
+  },
+  "CaptureBrief": {
+   "type": "object",
+   "additionalProperties": false,
+   "required": [
+    "locations",
+    "people",
+    "props",
+    "shots",
+    "permissions",
+    "fallback"
+   ],
+   "properties": {
+    "locations": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 500
+     },
+     "minItems": 1,
+     "maxItems": 20
+    },
+    "people": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 500
+     },
+     "minItems": 0,
+     "maxItems": 30
+    },
+    "props": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 500
+     },
+     "minItems": 0,
+     "maxItems": 30
+    },
+    "shots": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/Shot"
+     },
+     "minItems": 1,
+     "maxItems": 500
+    },
+    "permissions": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1000
+     },
+     "minItems": 0,
+     "maxItems": 30
+    },
+    "fallback": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 2000
+    }
+   }
+  },
+  "SocialUnit": {
+   "type": "object",
+   "additionalProperties": false,
+   "required": [
+    "id",
+    "channel",
+    "kind",
+    "copy",
+    "frames",
+    "capture_brief",
+    "design_brief",
+    "accessibility",
+    "measurement"
+   ],
+   "properties": {
+    "id": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 80
+    },
+    "channel": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 120
+    },
+    "kind": {
+     "type": "string",
+     "enum": [
+      "post",
+      "stories",
+      "carousel",
+      "short_video"
+     ]
+    },
+    "copy": {
+     "$ref": "#/$defs/CopyVariant"
+    },
+    "frames": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/StoryFrame"
+     },
+     "minItems": 0,
+     "maxItems": 30
+    },
+    "capture_brief": {
+     "anyOf": [
+      {
+       "$ref": "#/$defs/CaptureBrief"
+      },
+      {
+       "type": "null"
+      }
+     ]
+    },
+    "design_brief": {
+     "anyOf": [
+      {
+       "$ref": "#/$defs/DesignBrief"
+      },
+      {
+       "type": "null"
+      }
+     ]
+    },
+    "accessibility": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 700
+     },
+     "minItems": 1,
+     "maxItems": 20
+    },
+    "measurement": {
+     "$ref": "#/$defs/MeasurementPlan"
+    }
+   }
+  },
+  "VideoScript": {
+   "type": "object",
+   "additionalProperties": false,
+   "required": [
+    "id",
+    "title",
+    "duration_seconds",
+    "hook",
+    "shots",
+    "caption",
+    "formats",
+    "capture_brief",
+    "generation_prompts",
+    "rights_checks"
+   ],
+   "properties": {
+    "id": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 80
+    },
+    "title": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 160
+    },
+    "duration_seconds": {
+     "type": "number",
+     "minimum": 1,
+     "maximum": 3600
+    },
+    "hook": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 1000
+    },
+    "shots": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/Shot"
+     },
+     "minItems": 1,
+     "maxItems": 500
+    },
+    "caption": {
+     "$ref": "#/$defs/CopyVariant"
+    },
+    "formats": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/FormatSpec"
+     },
+     "minItems": 1,
+     "maxItems": 12
+    },
+    "capture_brief": {
+     "$ref": "#/$defs/CaptureBrief"
+    },
+    "generation_prompts": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/GenerationPrompt"
+     },
+     "minItems": 0,
+     "maxItems": 8
+    },
+    "rights_checks": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1000
+     },
+     "minItems": 1,
+     "maxItems": 30
+    }
+   }
+  },
+  "ArtDirection": {
+   "type": "object",
+   "additionalProperties": false,
+   "required": [
+    "id",
+    "concept",
+    "design_brief",
+    "system_rules",
+    "channel_adaptations",
+    "do_not"
+   ],
+   "properties": {
+    "id": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 80
+    },
+    "concept": {
+     "$ref": "#/$defs/Concept"
+    },
+    "design_brief": {
+     "$ref": "#/$defs/DesignBrief"
+    },
+    "system_rules": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1500
+     },
+     "minItems": 1,
+     "maxItems": 30
+    },
+    "channel_adaptations": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1500
+     },
+     "minItems": 1,
+     "maxItems": 20
+    },
+    "do_not": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1000
+     },
+     "minItems": 1,
+     "maxItems": 20
+    }
+   }
+  },
+  "ConceptSelection": {
+   "type": "object",
+   "additionalProperties": false,
+   "required": [
+    "concept",
+    "brief_score",
+    "distinctiveness_score",
+    "feasibility_score",
+    "evidence_score",
+    "weighted_score",
+    "selected",
+    "reason",
+    "validation_plan"
+   ],
+   "properties": {
+    "concept": {
+     "$ref": "#/$defs/Concept"
+    },
+    "brief_score": {
+     "type": "integer",
+     "minimum": 1,
+     "maximum": 5
+    },
+    "distinctiveness_score": {
+     "type": "integer",
+     "minimum": 1,
+     "maximum": 5
+    },
+    "feasibility_score": {
+     "type": "integer",
+     "minimum": 1,
+     "maximum": 5
+    },
+    "evidence_score": {
+     "type": "integer",
+     "minimum": 1,
+     "maximum": 5
+    },
+    "weighted_score": {
+     "type": "number",
+     "minimum": 1,
+     "maximum": 5
+    },
+    "selected": {
+     "type": "boolean"
+    },
+    "reason": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 1500
+    },
+    "validation_plan": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 1500
+    }
+   }
+  },
+  "BudgetLine": {
+   "type": "object",
+   "additionalProperties": false,
+   "required": [
+    "ad_set_id",
+    "share_percent",
+    "amount",
+    "currency",
+    "budget_knowledge_refs"
+   ],
+   "properties": {
+    "ad_set_id": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 80
+    },
+    "share_percent": {
+     "type": "number",
+     "minimum": 0,
+     "maximum": 100
+    },
+    "amount": {
+     "anyOf": [
+      {
+       "type": "number",
+       "minimum": 0,
+       "maximum": 1000000000
+      },
+      {
+       "type": "null"
+      }
+     ]
+    },
+    "currency": {
+     "anyOf": [
+      {
+       "type": "string",
+       "enum": [
+        "UAH",
+        "USD",
+        "EUR"
+       ]
+      },
+      {
+       "type": "null"
+      }
+     ]
+    },
+    "budget_knowledge_refs": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/KnowledgeRef"
+     },
+     "minItems": 0,
+     "maxItems": 10
+    }
+   }
+  },
+  "ABHypothesis": {
+   "type": "object",
+   "additionalProperties": false,
+   "required": [
+    "id",
+    "ad_set_id",
+    "variable",
+    "control",
+    "variant",
+    "success_metric",
+    "decision_rule",
+    "minimum_evidence",
+    "spend_guardrail"
+   ],
+   "properties": {
+    "id": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 80
+    },
+    "ad_set_id": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 80
+    },
+    "variable": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 300
+    },
+    "control": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 1500
+    },
+    "variant": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 1500
+    },
+    "success_metric": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 300
+    },
+    "decision_rule": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 1500
+    },
+    "minimum_evidence": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 1000
+    },
+    "spend_guardrail": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 1000
+    }
+   }
+  },
+  "AdSetPlan": {
+   "type": "object",
+   "additionalProperties": false,
+   "required": [
+    "id",
+    "platform",
+    "campaign_id",
+    "objective",
+    "geo_knowledge_refs",
+    "audience_hypothesis",
+    "exclusions",
+    "placements",
+    "ad_ids",
+    "keywords",
+    "negative_keywords",
+    "settings_to_verify"
+   ],
+   "properties": {
+    "id": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 80
+    },
+    "platform": {
+     "type": "string",
+     "enum": [
+      "meta",
+      "google"
+     ]
+    },
+    "campaign_id": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 80
+    },
+    "objective": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 500
+    },
+    "geo_knowledge_refs": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/KnowledgeRef"
+     },
+     "minItems": 1,
+     "maxItems": 30
+    },
+    "audience_hypothesis": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 2000
+    },
+    "exclusions": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 700
+     },
+     "minItems": 0,
+     "maxItems": 30
+    },
+    "placements": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 300
+     },
+     "minItems": 1,
+     "maxItems": 30
+    },
+    "ad_ids": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 80
+     },
+     "minItems": 1,
+     "maxItems": 30
+    },
+    "keywords": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 300
+     },
+     "minItems": 0,
+     "maxItems": 200
+    },
+    "negative_keywords": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 300
+     },
+     "minItems": 0,
+     "maxItems": 200
+    },
+    "settings_to_verify": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1000
+     },
+     "minItems": 0,
+     "maxItems": 30
+    }
+   }
+  },
+  "Ad": {
+   "type": "object",
+   "additionalProperties": false,
+   "required": [
+    "id",
+    "ad_set_id",
+    "copy_variants",
+    "creative",
+    "platform_constraints_knowledge_refs"
+   ],
+   "properties": {
+    "id": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 80
+    },
+    "ad_set_id": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 80
+    },
+    "copy_variants": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/CopyVariant"
+     },
+     "minItems": 1,
+     "maxItems": 10
+    },
+    "creative": {
+     "anyOf": [
+      {
+       "$ref": "#/$defs/CreativeSpec"
+      },
+      {
+       "type": "null"
+      }
+     ]
+    },
+    "platform_constraints_knowledge_refs": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/KnowledgeRef"
+     },
+     "minItems": 1,
+     "maxItems": 20
+    }
+   }
+  },
+  "PaidMediaStructure": {
+   "type": "object",
+   "additionalProperties": false,
+   "required": [
+    "campaign_ids",
+    "ad_sets",
+    "budget",
+    "experiments",
+    "measurement",
+    "launch_checklist"
+   ],
+   "properties": {
+    "campaign_ids": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 80
+     },
+     "minItems": 1,
+     "maxItems": 20
+    },
+    "ad_sets": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/AdSetPlan"
+     },
+     "minItems": 1,
+     "maxItems": 100
+    },
+    "budget": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/BudgetLine"
+     },
+     "minItems": 1,
+     "maxItems": 100
+    },
+    "experiments": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/ABHypothesis"
+     },
+     "minItems": 0,
+     "maxItems": 30
+    },
+    "measurement": {
+     "$ref": "#/$defs/MeasurementPlan"
+    },
+    "launch_checklist": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1000
+     },
+     "minItems": 1,
+     "maxItems": 40
+    }
+   }
+  },
+  "PrintSpec": {
+   "type": "object",
+   "additionalProperties": false,
+   "required": [
+    "id",
+    "medium",
+    "design",
+    "supplier_knowledge_refs",
+    "trim_mm",
+    "bleed_mm",
+    "safe_margin_mm",
+    "color_profile",
+    "resolution_dpi",
+    "scale",
+    "finishing",
+    "proof_checks",
+    "response_tracking"
+   ],
+   "properties": {
+    "id": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 80
+    },
+    "medium": {
+     "type": "string",
+     "enum": [
+      "billboard",
+      "citylight",
+      "flyer",
+      "a4",
+      "other"
+     ]
+    },
+    "design": {
+     "$ref": "#/$defs/DesignBrief"
+    },
+    "supplier_knowledge_refs": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/KnowledgeRef"
+     },
+     "minItems": 1,
+     "maxItems": 20
+    },
+    "trim_mm": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 100
+    },
+    "bleed_mm": {
+     "type": "number",
+     "minimum": 0,
+     "maximum": 100
+    },
+    "safe_margin_mm": {
+     "type": "number",
+     "minimum": 0,
+     "maximum": 1000
+    },
+    "color_profile": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 300
+    },
+    "resolution_dpi": {
+     "type": "integer",
+     "minimum": 1,
+     "maximum": 5000
+    },
+    "scale": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 100
+    },
+    "finishing": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 1000
+    },
+    "proof_checks": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1000
+     },
+     "minItems": 1,
+     "maxItems": 30
+    },
+    "response_tracking": {
+     "$ref": "#/$defs/MeasurementPlan"
+    }
+   }
+  },
+  "LaunchTask": {
+   "type": "object",
+   "additionalProperties": false,
+   "required": [
+    "id",
+    "channel",
+    "action",
+    "responsible_role",
+    "deadline",
+    "depends_on",
+    "acceptance",
+    "rollback"
+   ],
+   "properties": {
+    "id": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 80
+    },
+    "channel": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 120
+    },
+    "action": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 2000
+    },
+    "responsible_role": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 100
+    },
+    "deadline": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 80
+    },
+    "depends_on": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 80
+     },
+     "minItems": 0,
+     "maxItems": 30
+    },
+    "acceptance": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 1500
+    },
+    "rollback": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 1500
+    }
+   }
+  },
+  "LaunchUnit": {
+   "type": "object",
+   "additionalProperties": false,
+   "required": [
+    "id",
+    "channel",
+    "message",
+    "production_brief",
+    "support_faq"
+   ],
+   "properties": {
+    "id": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 80
+    },
+    "channel": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 120
+    },
+    "message": {
+     "$ref": "#/$defs/CopyVariant"
+    },
+    "production_brief": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 3000
+    },
+    "support_faq": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1200
+     },
+     "minItems": 0,
+     "maxItems": 30
+    }
+   }
+  },
+  "Calculation": {
+   "type": "object",
+   "additionalProperties": false,
+   "required": [
+    "id",
+    "metric",
+    "formula",
+    "input_refs",
+    "substituted_expression",
+    "value",
+    "unit",
+    "null_reason",
+    "limitations"
+   ],
+   "properties": {
+    "id": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 80
+    },
+    "metric": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 200
+    },
+    "formula": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 500
+    },
+    "input_refs": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/KnowledgeRef"
+     },
+     "minItems": 1,
+     "maxItems": 20
+    },
+    "substituted_expression": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 700
+    },
+    "value": {
+     "anyOf": [
+      {
+       "type": "number",
+       "minimum": -1000000000000,
+       "maximum": 1000000000000
+      },
+      {
+       "type": "null"
+      }
+     ]
+    },
+    "unit": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 80
+    },
+    "null_reason": {
+     "anyOf": [
+      {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 1000
+      },
+      {
+       "type": "null"
+      }
+     ]
+    },
+    "limitations": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1000
+     },
+     "minItems": 0,
+     "maxItems": 20
+    }
+   }
+  },
+  "Finding": {
+   "type": "object",
+   "additionalProperties": false,
+   "required": [
+    "id",
+    "statement",
+    "classification",
+    "source_refs",
+    "calculation_ids",
+    "confidence",
+    "limitation"
+   ],
+   "properties": {
+    "id": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 80
+    },
+    "statement": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 2500
+    },
+    "classification": {
+     "type": "string",
+     "enum": [
+      "fact",
+      "derived",
+      "hypothesis",
+      "unavailable"
+     ]
+    },
+    "source_refs": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/KnowledgeRef"
+     },
+     "minItems": 0,
+     "maxItems": 30
+    },
+    "calculation_ids": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 80
+     },
+     "minItems": 0,
+     "maxItems": 30
+    },
+    "confidence": {
+     "type": "string",
+     "enum": [
+      "high",
+      "medium",
+      "low",
+      "unavailable"
+     ]
+    },
+    "limitation": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 1500
+    }
+   }
+  },
+  "Action": {
+   "type": "object",
+   "additionalProperties": false,
+   "required": [
+    "id",
+    "action",
+    "priority",
+    "responsible_role",
+    "deadline",
+    "decision_rule",
+    "finding_ids"
+   ],
+   "properties": {
+    "id": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 80
+    },
+    "action": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 2000
+    },
+    "priority": {
+     "type": "string",
+     "enum": [
+      "P1",
+      "P2",
+      "P3"
+     ]
+    },
+    "responsible_role": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 100
+    },
+    "deadline": {
+     "anyOf": [
+      {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 80
+      },
+      {
+       "type": "null"
+      }
+     ]
+    },
+    "decision_rule": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 1500
+    },
+    "finding_ids": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 80
+     },
+     "minItems": 0,
+     "maxItems": 30
+    }
+   }
+  },
+  "CompetitorRow": {
+   "type": "object",
+   "additionalProperties": false,
+   "required": [
+    "competitor_id",
+    "dimension",
+    "observed_value",
+    "observed_at",
+    "source_refs",
+    "status"
+   ],
+   "properties": {
+    "competitor_id": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 100
+    },
+    "dimension": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 150
+    },
+    "observed_value": {
+     "anyOf": [
+      {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 2000
+      },
+      {
+       "type": "null"
+      }
+     ]
+    },
+    "observed_at": {
+     "anyOf": [
+      {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 80
+      },
+      {
+       "type": "null"
+      }
+     ]
+    },
+    "source_refs": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/KnowledgeRef"
+     },
+     "minItems": 0,
+     "maxItems": 20
+    },
+    "status": {
+     "type": "string",
+     "enum": [
+      "verified",
+      "unavailable"
+     ]
+    }
+   }
+  },
+  "ResearchCandidate": {
+   "type": "object",
+   "additionalProperties": false,
+   "required": [
+    "url",
+    "retrieved_at",
+    "excerpt",
+    "proposed_fact",
+    "needs_owner_approval"
+   ],
+   "properties": {
+    "url": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 2048
+    },
+    "retrieved_at": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 80
+    },
+    "excerpt": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 1000
+    },
+    "proposed_fact": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 1500
+    },
+    "needs_owner_approval": {
+     "const": true
+    }
+   }
+  },
+  "OwnedCopyUnit": {
+   "type": "object",
+   "additionalProperties": false,
+   "required": [
+    "id",
+    "kind",
+    "copy",
+    "subject",
+    "preheader",
+    "sections",
+    "metadata",
+    "delivery_checks",
+    "measurement"
+   ],
+   "properties": {
+    "id": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 80
+    },
+    "kind": {
+     "type": "string",
+     "enum": [
+      "website",
+      "landing",
+      "email",
+      "sms",
+      "pr",
+      "ivr",
+      "faq"
+     ]
+    },
+    "copy": {
+     "$ref": "#/$defs/CopyVariant"
+    },
+    "subject": {
+     "anyOf": [
+      {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 250
+      },
+      {
+       "type": "null"
+      }
+     ]
+    },
+    "preheader": {
+     "anyOf": [
+      {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 300
+      },
+      {
+       "type": "null"
+      }
+     ]
+    },
+    "sections": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 5000
+     },
+     "minItems": 0,
+     "maxItems": 30
+    },
+    "metadata": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1000
+     },
+     "minItems": 0,
+     "maxItems": 20
+    },
+    "delivery_checks": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1000
+     },
+     "minItems": 1,
+     "maxItems": 30
+    },
+    "measurement": {
+     "$ref": "#/$defs/MeasurementPlan"
+    }
+   }
+  },
+  "Preparation": {
+   "type": "object",
+   "additionalProperties": false,
+   "required": [
+    "status",
+    "summary",
+    "source_uses",
+    "claims_needing_source",
+    "assumptions",
+    "blocking_questions",
+    "work_items",
+    "constraints",
+    "measurement"
+   ],
+   "properties": {
+    "status": {
+     "type": "string",
+     "enum": [
+      "ready",
+      "blocked"
+     ]
+    },
+    "summary": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 1500
+    },
+    "source_uses": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/SourceUse"
+     },
+     "minItems": 0,
+     "maxItems": 300
+    },
+    "claims_needing_source": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/Claim"
+     },
+     "minItems": 0,
+     "maxItems": 100
+    },
+    "assumptions": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/Hypothesis"
+     },
+     "minItems": 0,
+     "maxItems": 50
+    },
+    "blocking_questions": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1000
+     },
+     "minItems": 0,
+     "maxItems": 30
+    },
+    "work_items": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/WorkItem"
+     },
+     "minItems": 0,
+     "maxItems": 100
+    },
+    "constraints": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1500
+     },
+     "minItems": 0,
+     "maxItems": 50
+    },
+    "measurement": {
+     "anyOf": [
+      {
+       "$ref": "#/$defs/MeasurementPlan"
+      },
+      {
+       "type": "null"
+      }
+     ]
+    }
+   },
+   "allOf": [
+    {
+     "if": {
+      "properties": {
+       "status": {
+        "const": "ready"
+       }
+      }
+     },
+     "then": {
+      "properties": {
+       "blocking_questions": {
+        "maxItems": 0
+       },
+       "work_items": {
+        "minItems": 1
+       }
+      }
+     }
+    }
+   ]
+  },
+  "ContentPlanOutput": {
+   "type": "object",
+   "additionalProperties": false,
+   "required": [
+    "status",
+    "summary",
+    "source_uses",
+    "claims_needing_source",
+    "assumptions",
+    "blocking_questions",
+    "items",
+    "cadence_rationale",
+    "production_dependencies"
+   ],
+   "properties": {
+    "status": {
+     "type": "string",
+     "enum": [
+      "ready",
+      "blocked"
+     ]
+    },
+    "summary": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 1500
+    },
+    "source_uses": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/SourceUse"
+     },
+     "minItems": 0,
+     "maxItems": 300
+    },
+    "claims_needing_source": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/Claim"
+     },
+     "minItems": 0,
+     "maxItems": 100
+    },
+    "assumptions": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/Hypothesis"
+     },
+     "minItems": 0,
+     "maxItems": 50
+    },
+    "blocking_questions": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1000
+     },
+     "minItems": 0,
+     "maxItems": 30
+    },
+    "items": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/ContentPlanItem"
+     },
+     "minItems": 0,
+     "maxItems": 100
+    },
+    "cadence_rationale": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 2000
+    },
+    "production_dependencies": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1500
+     },
+     "minItems": 0,
+     "maxItems": 40
+    }
+   },
+   "allOf": [
+    {
+     "if": {
+      "properties": {
+       "status": {
+        "const": "ready"
+       }
+      }
+     },
+     "then": {
+      "properties": {
+       "blocking_questions": {
+        "maxItems": 0
+       },
+       "items": {
+        "minItems": 1
+       }
+      }
+     }
+    }
+   ]
+  },
+  "SocialPackOutput": {
+   "type": "object",
+   "additionalProperties": false,
+   "required": [
+    "status",
+    "summary",
+    "source_uses",
+    "claims_needing_source",
+    "assumptions",
+    "blocking_questions",
+    "units",
+    "publishing_checklist"
+   ],
+   "properties": {
+    "status": {
+     "type": "string",
+     "enum": [
+      "ready",
+      "blocked"
+     ]
+    },
+    "summary": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 1500
+    },
+    "source_uses": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/SourceUse"
+     },
+     "minItems": 0,
+     "maxItems": 300
+    },
+    "claims_needing_source": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/Claim"
+     },
+     "minItems": 0,
+     "maxItems": 100
+    },
+    "assumptions": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/Hypothesis"
+     },
+     "minItems": 0,
+     "maxItems": 50
+    },
+    "blocking_questions": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1000
+     },
+     "minItems": 0,
+     "maxItems": 30
+    },
+    "units": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/SocialUnit"
+     },
+     "minItems": 0,
+     "maxItems": 30
+    },
+    "publishing_checklist": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1000
+     },
+     "minItems": 0,
+     "maxItems": 40
+    }
+   },
+   "allOf": [
+    {
+     "if": {
+      "properties": {
+       "status": {
+        "const": "ready"
+       }
+      }
+     },
+     "then": {
+      "properties": {
+       "blocking_questions": {
+        "maxItems": 0
+       },
+       "units": {
+        "minItems": 1
+       }
+      }
+     }
+    }
+   ]
+  },
+  "GraphicsOutput": {
+   "type": "object",
+   "additionalProperties": false,
+   "required": [
+    "status",
+    "summary",
+    "source_uses",
+    "claims_needing_source",
+    "assumptions",
+    "blocking_questions",
+    "creatives",
+    "export_checklist"
+   ],
+   "properties": {
+    "status": {
+     "type": "string",
+     "enum": [
+      "ready",
+      "blocked"
+     ]
+    },
+    "summary": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 1500
+    },
+    "source_uses": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/SourceUse"
+     },
+     "minItems": 0,
+     "maxItems": 300
+    },
+    "claims_needing_source": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/Claim"
+     },
+     "minItems": 0,
+     "maxItems": 100
+    },
+    "assumptions": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/Hypothesis"
+     },
+     "minItems": 0,
+     "maxItems": 50
+    },
+    "blocking_questions": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1000
+     },
+     "minItems": 0,
+     "maxItems": 30
+    },
+    "creatives": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/CreativeSpec"
+     },
+     "minItems": 0,
+     "maxItems": 30
+    },
+    "export_checklist": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1000
+     },
+     "minItems": 0,
+     "maxItems": 40
+    }
+   },
+   "allOf": [
+    {
+     "if": {
+      "properties": {
+       "status": {
+        "const": "ready"
+       }
+      }
+     },
+     "then": {
+      "properties": {
+       "blocking_questions": {
+        "maxItems": 0
+       },
+       "creatives": {
+        "minItems": 1
+       }
+      }
+     }
+    }
+   ]
+  },
+  "ArtDirectionOutput": {
+   "type": "object",
+   "additionalProperties": false,
+   "required": [
+    "status",
+    "summary",
+    "source_uses",
+    "claims_needing_source",
+    "assumptions",
+    "blocking_questions",
+    "directions",
+    "recommended_direction_id"
+   ],
+   "properties": {
+    "status": {
+     "type": "string",
+     "enum": [
+      "ready",
+      "blocked"
+     ]
+    },
+    "summary": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 1500
+    },
+    "source_uses": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/SourceUse"
+     },
+     "minItems": 0,
+     "maxItems": 300
+    },
+    "claims_needing_source": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/Claim"
+     },
+     "minItems": 0,
+     "maxItems": 100
+    },
+    "assumptions": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/Hypothesis"
+     },
+     "minItems": 0,
+     "maxItems": 50
+    },
+    "blocking_questions": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1000
+     },
+     "minItems": 0,
+     "maxItems": 30
+    },
+    "directions": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/ArtDirection"
+     },
+     "minItems": 0,
+     "maxItems": 3
+    },
+    "recommended_direction_id": {
+     "anyOf": [
+      {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 80
+      },
+      {
+       "type": "null"
+      }
+     ]
+    }
+   },
+   "allOf": [
+    {
+     "if": {
+      "properties": {
+       "status": {
+        "const": "ready"
+       }
+      }
+     },
+     "then": {
+      "properties": {
+       "blocking_questions": {
+        "maxItems": 0
+       },
+       "directions": {
+        "minItems": 1
+       }
+      }
+     }
+    }
+   ]
+  },
+  "IdeationPreparation": {
+   "type": "object",
+   "additionalProperties": false,
+   "required": [
+    "status",
+    "summary",
+    "source_uses",
+    "claims_needing_source",
+    "assumptions",
+    "blocking_questions",
+    "candidates",
+    "selection_weights"
+   ],
+   "properties": {
+    "status": {
+     "type": "string",
+     "enum": [
+      "ready",
+      "blocked"
+     ]
+    },
+    "summary": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 1500
+    },
+    "source_uses": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/SourceUse"
+     },
+     "minItems": 0,
+     "maxItems": 300
+    },
+    "claims_needing_source": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/Claim"
+     },
+     "minItems": 0,
+     "maxItems": 100
+    },
+    "assumptions": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/Hypothesis"
+     },
+     "minItems": 0,
+     "maxItems": 50
+    },
+    "blocking_questions": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1000
+     },
+     "minItems": 0,
+     "maxItems": 30
+    },
+    "candidates": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/Concept"
+     },
+     "minItems": 0,
+     "maxItems": 12
+    },
+    "selection_weights": {
+     "type": "object",
+     "additionalProperties": false,
+     "required": [
+      "brief",
+      "distinctiveness",
+      "feasibility",
+      "evidence"
+     ],
+     "properties": {
+      "brief": {
+       "type": "number",
+       "minimum": 0,
+       "maximum": 1
+      },
+      "distinctiveness": {
+       "type": "number",
+       "minimum": 0,
+       "maximum": 1
+      },
+      "feasibility": {
+       "type": "number",
+       "minimum": 0,
+       "maximum": 1
+      },
+      "evidence": {
+       "type": "number",
+       "minimum": 0,
+       "maximum": 1
+      }
+     }
+    }
+   },
+   "allOf": [
+    {
+     "if": {
+      "properties": {
+       "status": {
+        "const": "ready"
+       }
+      }
+     },
+     "then": {
+      "properties": {
+       "blocking_questions": {
+        "maxItems": 0
+       },
+       "candidates": {
+        "minItems": 6
+       }
+      }
+     }
+    }
+   ]
+  },
+  "IdeationOutput": {
+   "type": "object",
+   "additionalProperties": false,
+   "required": [
+    "status",
+    "summary",
+    "source_uses",
+    "claims_needing_source",
+    "assumptions",
+    "blocking_questions",
+    "ranked_candidates",
+    "selected_ids",
+    "discard_reasons"
+   ],
+   "properties": {
+    "status": {
+     "type": "string",
+     "enum": [
+      "ready",
+      "blocked"
+     ]
+    },
+    "summary": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 1500
+    },
+    "source_uses": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/SourceUse"
+     },
+     "minItems": 0,
+     "maxItems": 300
+    },
+    "claims_needing_source": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/Claim"
+     },
+     "minItems": 0,
+     "maxItems": 100
+    },
+    "assumptions": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/Hypothesis"
+     },
+     "minItems": 0,
+     "maxItems": 50
+    },
+    "blocking_questions": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1000
+     },
+     "minItems": 0,
+     "maxItems": 30
+    },
+    "ranked_candidates": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/ConceptSelection"
+     },
+     "minItems": 0,
+     "maxItems": 12
+    },
+    "selected_ids": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 80
+     },
+     "minItems": 0,
+     "maxItems": 5
+    },
+    "discard_reasons": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1500
+     },
+     "minItems": 0,
+     "maxItems": 12
+    }
+   },
+   "allOf": [
+    {
+     "if": {
+      "properties": {
+       "status": {
+        "const": "ready"
+       }
+      }
+     },
+     "then": {
+      "properties": {
+       "blocking_questions": {
+        "maxItems": 0
+       },
+       "ranked_candidates": {
+        "minItems": 6
+       }
+      }
+     }
+    }
+   ]
+  },
+  "PaidMediaOutput": {
+   "type": "object",
+   "additionalProperties": false,
+   "required": [
+    "status",
+    "summary",
+    "source_uses",
+    "claims_needing_source",
+    "assumptions",
+    "blocking_questions",
+    "structure",
+    "ads"
+   ],
+   "properties": {
+    "status": {
+     "type": "string",
+     "enum": [
+      "ready",
+      "blocked"
+     ]
+    },
+    "summary": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 1500
+    },
+    "source_uses": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/SourceUse"
+     },
+     "minItems": 0,
+     "maxItems": 300
+    },
+    "claims_needing_source": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/Claim"
+     },
+     "minItems": 0,
+     "maxItems": 100
+    },
+    "assumptions": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/Hypothesis"
+     },
+     "minItems": 0,
+     "maxItems": 50
+    },
+    "blocking_questions": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1000
+     },
+     "minItems": 0,
+     "maxItems": 30
+    },
+    "structure": {
+     "anyOf": [
+      {
+       "$ref": "#/$defs/PaidMediaStructure"
+      },
+      {
+       "type": "null"
+      }
+     ]
+    },
+    "ads": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/Ad"
+     },
+     "minItems": 0,
+     "maxItems": 30
+    }
+   },
+   "allOf": [
+    {
+     "if": {
+      "properties": {
+       "status": {
+        "const": "ready"
+       }
+      }
+     },
+     "then": {
+      "properties": {
+       "blocking_questions": {
+        "maxItems": 0
+       },
+       "ads": {
+        "minItems": 1
+       }
+      }
+     }
+    }
+   ]
+  },
+  "ScriptsOutput": {
+   "type": "object",
+   "additionalProperties": false,
+   "required": [
+    "status",
+    "summary",
+    "source_uses",
+    "claims_needing_source",
+    "assumptions",
+    "blocking_questions",
+    "scripts",
+    "production_checklist"
+   ],
+   "properties": {
+    "status": {
+     "type": "string",
+     "enum": [
+      "ready",
+      "blocked"
+     ]
+    },
+    "summary": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 1500
+    },
+    "source_uses": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/SourceUse"
+     },
+     "minItems": 0,
+     "maxItems": 300
+    },
+    "claims_needing_source": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/Claim"
+     },
+     "minItems": 0,
+     "maxItems": 100
+    },
+    "assumptions": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/Hypothesis"
+     },
+     "minItems": 0,
+     "maxItems": 50
+    },
+    "blocking_questions": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1000
+     },
+     "minItems": 0,
+     "maxItems": 30
+    },
+    "scripts": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/VideoScript"
+     },
+     "minItems": 0,
+     "maxItems": 10
+    },
+    "production_checklist": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1000
+     },
+     "minItems": 0,
+     "maxItems": 40
+    }
+   },
+   "allOf": [
+    {
+     "if": {
+      "properties": {
+       "status": {
+        "const": "ready"
+       }
+      }
+     },
+     "then": {
+      "properties": {
+       "blocking_questions": {
+        "maxItems": 0
+       },
+       "scripts": {
+        "minItems": 1
+       }
+      }
+     }
+    }
+   ]
+  },
+  "PrintOutput": {
+   "type": "object",
+   "additionalProperties": false,
+   "required": [
+    "status",
+    "summary",
+    "source_uses",
+    "claims_needing_source",
+    "assumptions",
+    "blocking_questions",
+    "layouts",
+    "supplier_questions"
+   ],
+   "properties": {
+    "status": {
+     "type": "string",
+     "enum": [
+      "ready",
+      "blocked"
+     ]
+    },
+    "summary": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 1500
+    },
+    "source_uses": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/SourceUse"
+     },
+     "minItems": 0,
+     "maxItems": 300
+    },
+    "claims_needing_source": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/Claim"
+     },
+     "minItems": 0,
+     "maxItems": 100
+    },
+    "assumptions": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/Hypothesis"
+     },
+     "minItems": 0,
+     "maxItems": 50
+    },
+    "blocking_questions": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1000
+     },
+     "minItems": 0,
+     "maxItems": 30
+    },
+    "layouts": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/PrintSpec"
+     },
+     "minItems": 0,
+     "maxItems": 10
+    },
+    "supplier_questions": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1000
+     },
+     "minItems": 0,
+     "maxItems": 30
+    }
+   },
+   "allOf": [
+    {
+     "if": {
+      "properties": {
+       "status": {
+        "const": "ready"
+       }
+      }
+     },
+     "then": {
+      "properties": {
+       "blocking_questions": {
+        "maxItems": 0
+       },
+       "layouts": {
+        "minItems": 1
+       }
+      }
+     }
+    }
+   ]
+  },
+  "LaunchOutput": {
+   "type": "object",
+   "additionalProperties": false,
+   "required": [
+    "status",
+    "summary",
+    "source_uses",
+    "claims_needing_source",
+    "assumptions",
+    "blocking_questions",
+    "units",
+    "tasks",
+    "measurement",
+    "readiness_checklist"
+   ],
+   "properties": {
+    "status": {
+     "type": "string",
+     "enum": [
+      "ready",
+      "blocked"
+     ]
+    },
+    "summary": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 1500
+    },
+    "source_uses": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/SourceUse"
+     },
+     "minItems": 0,
+     "maxItems": 300
+    },
+    "claims_needing_source": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/Claim"
+     },
+     "minItems": 0,
+     "maxItems": 100
+    },
+    "assumptions": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/Hypothesis"
+     },
+     "minItems": 0,
+     "maxItems": 50
+    },
+    "blocking_questions": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1000
+     },
+     "minItems": 0,
+     "maxItems": 30
+    },
+    "units": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/LaunchUnit"
+     },
+     "minItems": 0,
+     "maxItems": 20
+    },
+    "tasks": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/LaunchTask"
+     },
+     "minItems": 0,
+     "maxItems": 100
+    },
+    "measurement": {
+     "anyOf": [
+      {
+       "$ref": "#/$defs/MeasurementPlan"
+      },
+      {
+       "type": "null"
+      }
+     ]
+    },
+    "readiness_checklist": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1000
+     },
+     "minItems": 0,
+     "maxItems": 40
+    }
+   },
+   "allOf": [
+    {
+     "if": {
+      "properties": {
+       "status": {
+        "const": "ready"
+       }
+      }
+     },
+     "then": {
+      "properties": {
+       "blocking_questions": {
+        "maxItems": 0
+       },
+       "units": {
+        "minItems": 1
+       }
+      }
+     }
+    }
+   ]
+  },
+  "AnalysisOutput": {
+   "type": "object",
+   "additionalProperties": false,
+   "required": [
+    "status",
+    "summary",
+    "source_uses",
+    "claims_needing_source",
+    "assumptions",
+    "blocking_questions",
+    "findings",
+    "calculations",
+    "actions",
+    "data_quality"
+   ],
+   "properties": {
+    "status": {
+     "type": "string",
+     "enum": [
+      "ready",
+      "blocked"
+     ]
+    },
+    "summary": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 1500
+    },
+    "source_uses": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/SourceUse"
+     },
+     "minItems": 0,
+     "maxItems": 300
+    },
+    "claims_needing_source": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/Claim"
+     },
+     "minItems": 0,
+     "maxItems": 100
+    },
+    "assumptions": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/Hypothesis"
+     },
+     "minItems": 0,
+     "maxItems": 50
+    },
+    "blocking_questions": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1000
+     },
+     "minItems": 0,
+     "maxItems": 30
+    },
+    "findings": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/Finding"
+     },
+     "minItems": 0,
+     "maxItems": 30
+    },
+    "calculations": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/Calculation"
+     },
+     "minItems": 0,
+     "maxItems": 100
+    },
+    "actions": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/Action"
+     },
+     "minItems": 0,
+     "maxItems": 30
+    },
+    "data_quality": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1500
+     },
+     "minItems": 0,
+     "maxItems": 40
+    }
+   },
+   "allOf": [
+    {
+     "if": {
+      "properties": {
+       "status": {
+        "const": "ready"
+       }
+      }
+     },
+     "then": {
+      "properties": {
+       "blocking_questions": {
+        "maxItems": 0
+       },
+       "findings": {
+        "minItems": 1
+       }
+      }
+     }
+    }
+   ]
+  },
+  "CompetitorOutput": {
+   "type": "object",
+   "additionalProperties": false,
+   "required": [
+    "status",
+    "summary",
+    "source_uses",
+    "claims_needing_source",
+    "assumptions",
+    "blocking_questions",
+    "rows",
+    "findings",
+    "actions",
+    "research_candidates"
+   ],
+   "properties": {
+    "status": {
+     "type": "string",
+     "enum": [
+      "ready",
+      "blocked"
+     ]
+    },
+    "summary": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 1500
+    },
+    "source_uses": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/SourceUse"
+     },
+     "minItems": 0,
+     "maxItems": 300
+    },
+    "claims_needing_source": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/Claim"
+     },
+     "minItems": 0,
+     "maxItems": 100
+    },
+    "assumptions": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/Hypothesis"
+     },
+     "minItems": 0,
+     "maxItems": 50
+    },
+    "blocking_questions": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1000
+     },
+     "minItems": 0,
+     "maxItems": 30
+    },
+    "rows": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/CompetitorRow"
+     },
+     "minItems": 0,
+     "maxItems": 100
+    },
+    "findings": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/Finding"
+     },
+     "minItems": 0,
+     "maxItems": 30
+    },
+    "actions": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/Action"
+     },
+     "minItems": 0,
+     "maxItems": 30
+    },
+    "research_candidates": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/ResearchCandidate"
+     },
+     "minItems": 0,
+     "maxItems": 30
+    }
+   },
+   "allOf": [
+    {
+     "if": {
+      "properties": {
+       "status": {
+        "const": "ready"
+       }
+      }
+     },
+     "then": {
+      "properties": {
+       "blocking_questions": {
+        "maxItems": 0
+       },
+       "rows": {
+        "minItems": 1
+       }
+      }
+     }
+    }
+   ]
+  },
+  "OwnedCopyOutput": {
+   "type": "object",
+   "additionalProperties": false,
+   "required": [
+    "status",
+    "summary",
+    "source_uses",
+    "claims_needing_source",
+    "assumptions",
+    "blocking_questions",
+    "units",
+    "delivery_checklist"
+   ],
+   "properties": {
+    "status": {
+     "type": "string",
+     "enum": [
+      "ready",
+      "blocked"
+     ]
+    },
+    "summary": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 1500
+    },
+    "source_uses": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/SourceUse"
+     },
+     "minItems": 0,
+     "maxItems": 300
+    },
+    "claims_needing_source": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/Claim"
+     },
+     "minItems": 0,
+     "maxItems": 100
+    },
+    "assumptions": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/Hypothesis"
+     },
+     "minItems": 0,
+     "maxItems": 50
+    },
+    "blocking_questions": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1000
+     },
+     "minItems": 0,
+     "maxItems": 30
+    },
+    "units": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/OwnedCopyUnit"
+     },
+     "minItems": 0,
+     "maxItems": 30
+    },
+    "delivery_checklist": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1000
+     },
+     "minItems": 0,
+     "maxItems": 40
+    }
+   },
+   "allOf": [
+    {
+     "if": {
+      "properties": {
+       "status": {
+        "const": "ready"
+       }
+      }
+     },
+     "then": {
+      "properties": {
+       "blocking_questions": {
+        "maxItems": 0
+       },
+       "units": {
+        "minItems": 1
+       }
+      }
+     }
+    }
+   ]
+  },
+  "ReviewCriterionScore": {
+   "type": "object",
+   "additionalProperties": false,
+   "required": [
+    "key",
+    "score",
+    "evidence_pointer",
+    "reason"
+   ],
+   "properties": {
+    "key": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 80
+    },
+    "score": {
+     "type": "integer",
+     "minimum": 1,
+     "maximum": 5
+    },
+    "evidence_pointer": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 400
+    },
+    "reason": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 1500
+    }
+   }
+  },
+  "ReviewIssue": {
+   "type": "object",
+   "additionalProperties": false,
+   "required": [
+    "id",
+    "severity",
+    "artifact_pointer",
+    "fragment",
+    "criterion",
+    "fix",
+    "resolution"
+   ],
+   "properties": {
+    "id": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 80
+    },
+    "severity": {
+     "type": "string",
+     "enum": [
+      "critical",
+      "major",
+      "minor"
+     ]
+    },
+    "artifact_pointer": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 400
+    },
+    "fragment": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 1500
+    },
+    "criterion": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 80
+    },
+    "fix": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 2000
+    },
+    "resolution": {
+     "type": "string",
+     "enum": [
+      "open",
+      "resolved"
+     ]
+    }
+   }
+  },
+  "ReviewDecision": {
+   "type": "object",
+   "additionalProperties": false,
+   "required": [
+    "decision",
+    "reviewed_artifact_id",
+    "reviewed_version",
+    "scores",
+    "issues",
+    "resolved_issue_ids",
+    "summary"
+   ],
+   "properties": {
+    "decision": {
+     "type": "string",
+     "enum": [
+      "pass",
+      "revise",
+      "escalate"
+     ]
+    },
+    "reviewed_artifact_id": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 100
+    },
+    "reviewed_version": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 100
+    },
+    "scores": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/ReviewCriterionScore"
+     },
+     "minItems": 5,
+     "maxItems": 5
+    },
+    "issues": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/ReviewIssue"
+     },
+     "minItems": 0,
+     "maxItems": 50
+    },
+    "resolved_issue_ids": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 80
+     },
+     "minItems": 0,
+     "maxItems": 50
+    },
+    "summary": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 2000
+    }
+   }
+  },
+  "VersionRef": {
+   "type": "object",
+   "additionalProperties": false,
+   "required": [
+    "id",
+    "version",
+    "hash"
+   ],
+   "properties": {
+    "id": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 100
+    },
+    "version": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 100
+    },
+    "hash": {
+     "type": "string",
+     "pattern": "^[a-f0-9]{64}$"
+    }
+   }
+  },
+  "ContentManifest": {
+   "type": "object",
+   "additionalProperties": false,
+   "required": [
+    "run_id",
+    "playbook_key",
+    "playbook_version",
+    "brief_ref",
+    "knowledge_snapshot_ref",
+    "artifact_refs",
+    "review_ref"
+   ],
+   "properties": {
+    "run_id": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 100
+    },
+    "playbook_key": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 100
+    },
+    "playbook_version": {
+     "type": "integer",
+     "minimum": 1,
+     "maximum": 100000
+    },
+    "brief_ref": {
+     "$ref": "#/$defs/VersionRef"
+    },
+    "knowledge_snapshot_ref": {
+     "$ref": "#/$defs/VersionRef"
+    },
+    "artifact_refs": {
+     "type": "array",
+     "items": {
+      "$ref": "#/$defs/VersionRef"
+     },
+     "minItems": 2,
+     "maxItems": 3
+    },
+    "review_ref": {
+     "$ref": "#/$defs/VersionRef"
+    }
+   }
+  },
+  "Approval": {
+   "type": "object",
+   "additionalProperties": false,
+   "required": [
+    "id",
+    "decision",
+    "actor_id",
+    "decided_at",
+    "run_id",
+    "content_manifest_hash",
+    "comment"
+   ],
+   "properties": {
+    "id": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 100
+    },
+    "decision": {
+     "type": "string",
+     "enum": [
+      "approve",
+      "request_changes",
+      "reject",
+      "resolve_inputs"
+     ]
+    },
+    "actor_id": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 100
+    },
+    "decided_at": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 80,
+     "format": "date-time"
+    },
+    "run_id": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 100
+    },
+    "content_manifest_hash": {
+     "type": "string",
+     "pattern": "^[a-f0-9]{64}$"
+    },
+    "comment": {
+     "type": "string",
+     "minLength": 0,
+     "maxLength": 3000
+    }
+   }
+  },
+  "ApprovedManifest": {
+   "type": "object",
+   "additionalProperties": false,
+   "required": [
+    "content",
+    "content_manifest_hash",
+    "approval_id",
+    "approved_by",
+    "approved_at"
+   ],
+   "properties": {
+    "content": {
+     "$ref": "#/$defs/ContentManifest"
+    },
+    "content_manifest_hash": {
+     "type": "string",
+     "pattern": "^[a-f0-9]{64}$"
+    },
+    "approval_id": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 100
+    },
+    "approved_by": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 100
+    },
+    "approved_at": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 80,
+     "format": "date-time"
+    }
+   }
+  },
+  "OwnerPackage": {
+   "type": "object",
+   "additionalProperties": false,
+   "required": [
+    "state",
+    "run_id",
+    "final_artifact",
+    "review_ref",
+    "section_keys",
+    "blocking_reasons",
+    "content_manifest"
+   ],
+   "properties": {
+    "state": {
+     "type": "string",
+     "enum": [
+      "blocked",
+      "escalated",
+      "ready_for_approval"
+     ]
+    },
+    "run_id": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 100
+    },
+    "final_artifact": {
+     "anyOf": [
+      {
+       "$ref": "#/$defs/VersionRef"
+      },
+      {
+       "type": "null"
+      }
+     ]
+    },
+    "review_ref": {
+     "anyOf": [
+      {
+       "$ref": "#/$defs/VersionRef"
+      },
+      {
+       "type": "null"
+      }
+     ]
+    },
+    "section_keys": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 100
+     },
+     "minItems": 1,
+     "maxItems": 30
+    },
+    "blocking_reasons": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1500
+     },
+     "minItems": 0,
+     "maxItems": 50
+    },
+    "content_manifest": {
+     "anyOf": [
+      {
+       "$ref": "#/$defs/ContentManifest"
+      },
+      {
+       "type": "null"
+      }
+     ]
+    }
+   }
+  },
+  "HandoffReceipt": {
+   "type": "object",
+   "additionalProperties": false,
+   "required": [
+    "status",
+    "destination",
+    "approved_manifest",
+    "payload_artifact",
+    "idempotency_key",
+    "created_at"
+   ],
+   "properties": {
+    "status": {
+     "const": "handoff_ready"
+    },
+    "destination": {
+     "type": "string",
+     "enum": [
+      "graphic_designer",
+      "video_editor",
+      "print",
+      "ads_manager",
+      "smm",
+      "human"
+     ]
+    },
+    "approved_manifest": {
+     "$ref": "#/$defs/ApprovedManifest"
+    },
+    "payload_artifact": {
+     "$ref": "#/$defs/VersionRef"
+    },
+    "idempotency_key": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 300
+    },
+    "created_at": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 80,
+     "format": "date-time"
+    }
+   }
+  }
+ }
+}

@@ -159,4 +159,5 @@ export const oohConceptsSpec: PlaybookSpec = {
   handoff: { to: "print_designer", note: "Макети за ТЗ: рендер PNG/PDF із вильотами для друкарні" },
 };
 
-export const oohConcepts = playbookFromSpec(oohConceptsSpec);
+// Superseded by the library playbook outdoor_print_pack; kept so runs started with it can finish.
+export const oohConcepts = playbookFromSpec(oohConceptsSpec, { hidden: true });

@@ -1,0 +1,1400 @@
+{
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "$defs": {
+  "smm_content_plan": {
+   "type": "object",
+   "additionalProperties": false,
+   "properties": {
+    "title": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 200
+    },
+    "objective": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 3000
+    },
+    "audience": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 2000
+    },
+    "channel": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 120
+    },
+    "deliverable_count": {
+     "type": "integer",
+     "minimum": 1,
+     "maximum": 100
+    },
+    "deadline": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 80,
+     "format": "date-time"
+    },
+    "acceptance_criteria": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1500
+     },
+     "minItems": 1,
+     "maxItems": 20
+    },
+    "references": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 2048
+     },
+     "minItems": 0,
+     "maxItems": 20
+    },
+    "period_start": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 10,
+     "format": "date"
+    },
+    "period_end": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 10,
+     "format": "date"
+    },
+    "channels": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1000
+     },
+     "minItems": 1,
+     "maxItems": 5,
+     "uniqueItems": true
+    },
+    "pillars": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1000
+     },
+     "minItems": 1,
+     "maxItems": 12,
+     "uniqueItems": true
+    },
+    "capacity_knowledge_ids": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1000
+     },
+     "minItems": 1,
+     "maxItems": 10,
+     "uniqueItems": true
+    },
+    "events_knowledge_ids": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1000
+     },
+     "minItems": 0,
+     "maxItems": 30,
+     "uniqueItems": true
+    }
+   },
+   "required": [
+    "title",
+    "objective",
+    "audience",
+    "channel",
+    "deliverable_count",
+    "deadline",
+    "acceptance_criteria",
+    "references",
+    "period_start",
+    "period_end",
+    "channels",
+    "capacity_knowledge_ids"
+   ]
+  },
+  "social_content_pack": {
+   "type": "object",
+   "additionalProperties": false,
+   "properties": {
+    "title": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 200
+    },
+    "objective": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 3000
+    },
+    "audience": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 2000
+    },
+    "channel": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 120
+    },
+    "deliverable_count": {
+     "type": "integer",
+     "minimum": 1,
+     "maximum": 30
+    },
+    "deadline": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 80,
+     "format": "date-time"
+    },
+    "acceptance_criteria": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1500
+     },
+     "minItems": 1,
+     "maxItems": 20
+    },
+    "references": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 2048
+     },
+     "minItems": 0,
+     "maxItems": 20
+    },
+    "content_kind": {
+     "type": "string",
+     "enum": [
+      "post",
+      "stories",
+      "carousel",
+      "short_video"
+     ]
+    },
+    "channels": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1000
+     },
+     "minItems": 1,
+     "maxItems": 5,
+     "uniqueItems": true
+    },
+    "plan_item_ids": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1000
+     },
+     "minItems": 0,
+     "maxItems": 30,
+     "uniqueItems": true
+    },
+    "available_asset_ids": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1000
+     },
+     "minItems": 0,
+     "maxItems": 30,
+     "uniqueItems": true
+    },
+    "production_constraints": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 3000
+    },
+    "platform_spec_knowledge_ids": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1000
+     },
+     "minItems": 1,
+     "maxItems": 20,
+     "uniqueItems": true
+    }
+   },
+   "required": [
+    "title",
+    "objective",
+    "audience",
+    "channel",
+    "deliverable_count",
+    "deadline",
+    "acceptance_criteria",
+    "references",
+    "content_kind",
+    "channels",
+    "production_constraints",
+    "platform_spec_knowledge_ids"
+   ]
+  },
+  "graphic_design_pack": {
+   "type": "object",
+   "additionalProperties": false,
+   "properties": {
+    "title": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 200
+    },
+    "objective": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 3000
+    },
+    "audience": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 2000
+    },
+    "channel": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 120
+    },
+    "deliverable_count": {
+     "type": "integer",
+     "minimum": 1,
+     "maximum": 30
+    },
+    "deadline": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 80,
+     "format": "date-time"
+    },
+    "acceptance_criteria": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1500
+     },
+     "minItems": 1,
+     "maxItems": 20
+    },
+    "references": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 2048
+     },
+     "minItems": 0,
+     "maxItems": 20
+    },
+    "placements": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1000
+     },
+     "minItems": 1,
+     "maxItems": 12,
+     "uniqueItems": true
+    },
+    "format_knowledge_ids": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1000
+     },
+     "minItems": 1,
+     "maxItems": 12,
+     "uniqueItems": true
+    },
+    "asset_ids": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1000
+     },
+     "minItems": 0,
+     "maxItems": 30,
+     "uniqueItems": true
+    },
+    "art_direction_artifact_id": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 3000
+    },
+    "required_copy": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1000
+     },
+     "minItems": 0,
+     "maxItems": 20,
+     "uniqueItems": true
+    }
+   },
+   "required": [
+    "title",
+    "objective",
+    "audience",
+    "channel",
+    "deliverable_count",
+    "deadline",
+    "acceptance_criteria",
+    "references",
+    "placements",
+    "format_knowledge_ids"
+   ]
+  },
+  "campaign_art_direction": {
+   "type": "object",
+   "additionalProperties": false,
+   "properties": {
+    "title": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 200
+    },
+    "objective": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 3000
+    },
+    "audience": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 2000
+    },
+    "channel": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 120
+    },
+    "deliverable_count": {
+     "type": "integer",
+     "minimum": 1,
+     "maximum": 3
+    },
+    "deadline": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 80,
+     "format": "date-time"
+    },
+    "acceptance_criteria": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1500
+     },
+     "minItems": 1,
+     "maxItems": 20
+    },
+    "references": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 2048
+     },
+     "minItems": 0,
+     "maxItems": 20
+    },
+    "campaign_channels": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1000
+     },
+     "minItems": 1,
+     "maxItems": 12,
+     "uniqueItems": true
+    },
+    "mandatory_asset_ids": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1000
+     },
+     "minItems": 0,
+     "maxItems": 30,
+     "uniqueItems": true
+    },
+    "visual_constraints": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 3000
+    },
+    "reference_notes": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1000
+     },
+     "minItems": 0,
+     "maxItems": 20,
+     "uniqueItems": true
+    }
+   },
+   "required": [
+    "title",
+    "objective",
+    "audience",
+    "channel",
+    "deliverable_count",
+    "deadline",
+    "acceptance_criteria",
+    "references",
+    "campaign_channels",
+    "visual_constraints"
+   ]
+  },
+  "creative_ideation": {
+   "type": "object",
+   "additionalProperties": false,
+   "properties": {
+    "title": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 200
+    },
+    "objective": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 3000
+    },
+    "audience": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 2000
+    },
+    "channel": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 120
+    },
+    "deliverable_count": {
+     "type": "integer",
+     "minimum": 1,
+     "maximum": 5
+    },
+    "deadline": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 80,
+     "format": "date-time"
+    },
+    "acceptance_criteria": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1500
+     },
+     "minItems": 1,
+     "maxItems": 20
+    },
+    "references": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 2048
+     },
+     "minItems": 0,
+     "maxItems": 20
+    },
+    "idea_kind": {
+     "type": "string",
+     "enum": [
+      "campaign",
+      "activation",
+      "hook",
+      "naming",
+      "mechanic"
+     ]
+    },
+    "candidate_count": {
+     "type": "integer",
+     "minimum": 6,
+     "maximum": 12
+    },
+    "creative_boundaries": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 3000
+    },
+    "rejected_ideas": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1000
+     },
+     "minItems": 0,
+     "maxItems": 30,
+     "uniqueItems": true
+    }
+   },
+   "required": [
+    "title",
+    "objective",
+    "audience",
+    "channel",
+    "deliverable_count",
+    "deadline",
+    "acceptance_criteria",
+    "references",
+    "idea_kind",
+    "candidate_count",
+    "creative_boundaries"
+   ]
+  },
+  "paid_media_campaign": {
+   "type": "object",
+   "additionalProperties": false,
+   "properties": {
+    "title": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 200
+    },
+    "objective": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 3000
+    },
+    "audience": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 2000
+    },
+    "channel": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 120
+    },
+    "deliverable_count": {
+     "type": "integer",
+     "minimum": 1,
+     "maximum": 30
+    },
+    "deadline": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 80,
+     "format": "date-time"
+    },
+    "acceptance_criteria": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1500
+     },
+     "minItems": 1,
+     "maxItems": 20
+    },
+    "references": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 2048
+     },
+     "minItems": 0,
+     "maxItems": 20
+    },
+    "platform": {
+     "type": "string",
+     "enum": [
+      "meta",
+      "google"
+     ]
+    },
+    "offer_knowledge_id": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 3000
+    },
+    "geo_knowledge_ids": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1000
+     },
+     "minItems": 1,
+     "maxItems": 30,
+     "uniqueItems": true
+    },
+    "budget_knowledge_id": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 3000
+    },
+    "conversion_knowledge_id": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 3000
+    },
+    "platform_spec_knowledge_ids": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1000
+     },
+     "minItems": 1,
+     "maxItems": 20,
+     "uniqueItems": true
+    },
+    "landing_knowledge_id": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 3000
+    }
+   },
+   "required": [
+    "title",
+    "objective",
+    "audience",
+    "channel",
+    "deliverable_count",
+    "deadline",
+    "acceptance_criteria",
+    "references",
+    "platform",
+    "offer_knowledge_id",
+    "geo_knowledge_ids",
+    "budget_knowledge_id",
+    "conversion_knowledge_id",
+    "platform_spec_knowledge_ids",
+    "landing_knowledge_id"
+   ]
+  },
+  "reels_concepts": {
+   "type": "object",
+   "additionalProperties": false,
+   "properties": {
+    "title": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 200
+    },
+    "objective": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 3000
+    },
+    "audience": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 2000
+    },
+    "channel": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 120
+    },
+    "deliverable_count": {
+     "type": "integer",
+     "minimum": 1,
+     "maximum": 10
+    },
+    "deadline": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 80,
+     "format": "date-time"
+    },
+    "acceptance_criteria": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1500
+     },
+     "minItems": 1,
+     "maxItems": 20
+    },
+    "references": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 2048
+     },
+     "minItems": 0,
+     "maxItems": 20
+    },
+    "video_kind": {
+     "type": "string",
+     "enum": [
+      "reel",
+      "promo",
+      "explainer",
+      "testimonial"
+     ]
+    },
+    "duration_seconds": {
+     "type": "number",
+     "minimum": 1,
+     "maximum": 3600
+    },
+    "format_knowledge_ids": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1000
+     },
+     "minItems": 1,
+     "maxItems": 12,
+     "uniqueItems": true
+    },
+    "production_constraints": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 3000
+    },
+    "asset_ids": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1000
+     },
+     "minItems": 0,
+     "maxItems": 30,
+     "uniqueItems": true
+    },
+    "voice_style": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 3000
+    }
+   },
+   "required": [
+    "title",
+    "objective",
+    "audience",
+    "channel",
+    "deliverable_count",
+    "deadline",
+    "acceptance_criteria",
+    "references",
+    "video_kind",
+    "duration_seconds",
+    "format_knowledge_ids",
+    "production_constraints"
+   ]
+  },
+  "outdoor_print_pack": {
+   "type": "object",
+   "additionalProperties": false,
+   "properties": {
+    "title": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 200
+    },
+    "objective": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 3000
+    },
+    "audience": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 2000
+    },
+    "channel": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 120
+    },
+    "deliverable_count": {
+     "type": "integer",
+     "minimum": 1,
+     "maximum": 10
+    },
+    "deadline": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 80,
+     "format": "date-time"
+    },
+    "acceptance_criteria": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1500
+     },
+     "minItems": 1,
+     "maxItems": 20
+    },
+    "references": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 2048
+     },
+     "minItems": 0,
+     "maxItems": 20
+    },
+    "medium": {
+     "type": "string",
+     "enum": [
+      "billboard",
+      "citylight",
+      "flyer",
+      "a4",
+      "other"
+     ]
+    },
+    "supplier_spec_knowledge_id": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 3000
+    },
+    "placement_knowledge_ids": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1000
+     },
+     "minItems": 1,
+     "maxItems": 30,
+     "uniqueItems": true
+    },
+    "cta_route_knowledge_id": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 3000
+    },
+    "mandatory_copy": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1000
+     },
+     "minItems": 0,
+     "maxItems": 20,
+     "uniqueItems": true
+    }
+   },
+   "required": [
+    "title",
+    "objective",
+    "audience",
+    "channel",
+    "deliverable_count",
+    "deadline",
+    "acceptance_criteria",
+    "references",
+    "medium",
+    "supplier_spec_knowledge_id",
+    "placement_knowledge_ids",
+    "cta_route_knowledge_id"
+   ]
+  },
+  "offer_launch": {
+   "type": "object",
+   "additionalProperties": false,
+   "properties": {
+    "title": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 200
+    },
+    "objective": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 3000
+    },
+    "audience": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 2000
+    },
+    "channel": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 120
+    },
+    "deliverable_count": {
+     "type": "integer",
+     "minimum": 1,
+     "maximum": 20
+    },
+    "deadline": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 80,
+     "format": "date-time"
+    },
+    "acceptance_criteria": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1500
+     },
+     "minItems": 1,
+     "maxItems": 20
+    },
+    "references": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 2048
+     },
+     "minItems": 0,
+     "maxItems": 20
+    },
+    "offer_knowledge_id": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 3000
+    },
+    "launch_channels": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1000
+     },
+     "minItems": 1,
+     "maxItems": 12,
+     "uniqueItems": true
+    },
+    "launch_at": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 80,
+     "format": "date-time"
+    },
+    "readiness_knowledge_ids": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1000
+     },
+     "minItems": 1,
+     "maxItems": 20,
+     "uniqueItems": true
+    },
+    "previous_offer_knowledge_id": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 3000
+    }
+   },
+   "required": [
+    "title",
+    "objective",
+    "audience",
+    "channel",
+    "deliverable_count",
+    "deadline",
+    "acceptance_criteria",
+    "references",
+    "offer_knowledge_id",
+    "launch_channels",
+    "launch_at",
+    "readiness_knowledge_ids"
+   ]
+  },
+  "campaign_analysis": {
+   "type": "object",
+   "additionalProperties": false,
+   "properties": {
+    "title": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 200
+    },
+    "objective": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 3000
+    },
+    "audience": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 2000
+    },
+    "channel": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 120
+    },
+    "deliverable_count": {
+     "type": "integer",
+     "minimum": 1,
+     "maximum": 30
+    },
+    "deadline": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 80,
+     "format": "date-time"
+    },
+    "acceptance_criteria": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1500
+     },
+     "minItems": 1,
+     "maxItems": 20
+    },
+    "references": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 2048
+     },
+     "minItems": 0,
+     "maxItems": 20
+    },
+    "dataset_knowledge_ids": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1000
+     },
+     "minItems": 1,
+     "maxItems": 20,
+     "uniqueItems": true
+    },
+    "period": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 3000
+    },
+    "comparison_period": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 3000
+    },
+    "metric_keys": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1000
+     },
+     "minItems": 1,
+     "maxItems": 30,
+     "uniqueItems": true
+    },
+    "decision_question": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 3000
+    }
+   },
+   "required": [
+    "title",
+    "objective",
+    "audience",
+    "channel",
+    "deliverable_count",
+    "deadline",
+    "acceptance_criteria",
+    "references",
+    "dataset_knowledge_ids",
+    "period",
+    "metric_keys",
+    "decision_question"
+   ]
+  },
+  "competitor_analysis": {
+   "type": "object",
+   "additionalProperties": false,
+   "properties": {
+    "title": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 200
+    },
+    "objective": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 3000
+    },
+    "audience": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 2000
+    },
+    "channel": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 120
+    },
+    "deliverable_count": {
+     "type": "integer",
+     "minimum": 1,
+     "maximum": 30
+    },
+    "deadline": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 80,
+     "format": "date-time"
+    },
+    "acceptance_criteria": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1500
+     },
+     "minItems": 1,
+     "maxItems": 20
+    },
+    "references": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 2048
+     },
+     "minItems": 0,
+     "maxItems": 20
+    },
+    "competitors": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1000
+     },
+     "minItems": 1,
+     "maxItems": 10,
+     "uniqueItems": true
+    },
+    "dimensions": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1000
+     },
+     "minItems": 1,
+     "maxItems": 10,
+     "uniqueItems": true
+    },
+    "geo_knowledge_ids": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1000
+     },
+     "minItems": 1,
+     "maxItems": 30,
+     "uniqueItems": true
+    },
+    "source_knowledge_ids": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1000
+     },
+     "minItems": 1,
+     "maxItems": 30,
+     "uniqueItems": true
+    },
+    "research_mode": {
+     "type": "string",
+     "enum": [
+      "knowledge_only",
+      "candidate_collection"
+     ]
+    }
+   },
+   "required": [
+    "title",
+    "objective",
+    "audience",
+    "channel",
+    "deliverable_count",
+    "deadline",
+    "acceptance_criteria",
+    "references",
+    "competitors",
+    "dimensions",
+    "geo_knowledge_ids",
+    "source_knowledge_ids",
+    "research_mode"
+   ]
+  },
+  "owned_media_copy": {
+   "type": "object",
+   "additionalProperties": false,
+   "properties": {
+    "title": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 200
+    },
+    "objective": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 3000
+    },
+    "audience": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 2000
+    },
+    "channel": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 120
+    },
+    "deliverable_count": {
+     "type": "integer",
+     "minimum": 1,
+     "maximum": 30
+    },
+    "deadline": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 80,
+     "format": "date-time"
+    },
+    "acceptance_criteria": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1500
+     },
+     "minItems": 1,
+     "maxItems": 20
+    },
+    "references": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 2048
+     },
+     "minItems": 0,
+     "maxItems": 20
+    },
+    "copy_kind": {
+     "type": "string",
+     "enum": [
+      "website",
+      "landing",
+      "email",
+      "sms",
+      "pr",
+      "ivr",
+      "faq"
+     ]
+    },
+    "message_knowledge_ids": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1000
+     },
+     "minItems": 1,
+     "maxItems": 30,
+     "uniqueItems": true
+    },
+    "destination_knowledge_id": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 3000
+    },
+    "delivery_spec_knowledge_id": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 3000
+    },
+    "publication_at": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 80,
+     "format": "date-time"
+    },
+    "mandatory_sections": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1000
+     },
+     "minItems": 0,
+     "maxItems": 30,
+     "uniqueItems": true
+    }
+   },
+   "required": [
+    "title",
+    "objective",
+    "audience",
+    "channel",
+    "deliverable_count",
+    "deadline",
+    "acceptance_criteria",
+    "references",
+    "copy_kind",
+    "message_knowledge_ids",
+    "delivery_spec_knowledge_id"
+   ]
+  }
+ }
+}

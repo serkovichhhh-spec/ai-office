@@ -58,6 +58,8 @@ export const ROLE_LABEL: Record<string, string> = {
   creative_director: "Арт-директор",
   copywriter: "Копірайтер",
   reviewer: "QA-рев'юер",
+  scriptwriter: "Сценарист",
+  ads_specialist: "Таргетолог",
 };
 
 export function StatusPill({ status, map = RUN_STATUS }: { status: string; map?: Record<string, { label: string; tone: string }> }) {

@@ -37,7 +37,7 @@ export class SessionProvider implements AiProvider {
   constructor(private readonly response: AgentResponse | null) {}
 
   async generate<T>(req: GenerateRequest<T>): Promise<GenerateResult<T>> {
-    const jsonSchema = z.toJSONSchema(req.schema, { target: "draft-7" }) as Record<string, unknown>;
+    const jsonSchema = req.jsonSchema ?? (z.toJSONSchema(req.schema, { target: "draft-7" }) as Record<string, unknown>);
     delete jsonSchema.$schema;
     const base: AgentRequest = { schemaName: req.schemaName, jsonSchema, system: req.system, user: req.user, tier: req.tier };
 
@@ -47,7 +47,8 @@ export class SessionProvider implements AiProvider {
     const parsed = req.schema.safeParse(this.response.output);
     if (!parsed.success) {
       // Ask again, telling the session exactly what was wrong.
-      throw new AgentNeededError({ ...base, note: `Попередня відповідь не пройшла перевірку схеми: ${parsed.error.message.slice(0, 600)}` });
+      const issues = parsed.error.issues.slice(0, 12).map((i) => `${i.path.length ? i.path.join(".") + ": " : ""}${i.message}`).join("; ");
+      throw new AgentNeededError({ ...base, note: `Попередня відповідь не пройшла перевірку: ${issues.slice(0, 1200)}` });
     }
     return { output: parsed.data, usage: { tokens_in: 0, tokens_out: 0, cost_usd: 0 }, model: this.response.executor === "chatgpt" ? "chatgpt" : "claude-session", provider: "session" };
   }

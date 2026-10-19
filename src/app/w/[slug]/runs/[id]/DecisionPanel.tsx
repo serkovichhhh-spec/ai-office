@@ -2,7 +2,7 @@
 import { useActionState, useState } from "react";
 import { decideAction, type ActionState } from "../../../../actions";
 
-export function DecisionPanel({ artifactId, version }: { artifactId: string; version: number }) {
+export function DecisionPanel({ artifactId, version, canApprove = true }: { artifactId: string; version: number; canApprove?: boolean }) {
   const [state, action, pending] = useActionState<ActionState, FormData>(decideAction, {});
   const [comment, setComment] = useState("");
   return (
@@ -17,7 +17,7 @@ export function DecisionPanel({ artifactId, version }: { artifactId: string; ver
         </label>
         {state.error && <p className="error" role="alert" style={{ marginTop: 8 }}>{state.error}</p>}
         <div className="actions">
-          <button className="btn approve" name="decision" value="approved" disabled={pending}>Затвердити</button>
+          {canApprove && <button className="btn approve" name="decision" value="approved" disabled={pending}>Затвердити</button>}
           <button className="btn secondary" name="decision" value="revision_requested" disabled={pending || !comment.trim()}>
             Доопрацювати
           </button>

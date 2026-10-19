@@ -25,6 +25,8 @@ const PALETTES: Record<string, { H: string; C: string; P: string; glasses?: bool
   graphic_designer: { H: "#c0392b", C: "#2c3e50", P: "#1abc9c" },
   print_designer: { H: "#5d4037", C: "#7f8c8d", P: "#e74c3c" },
   video_editor: { H: "#111111", C: "#34495e", P: "#9b59b6", glasses: true },
+  scriptwriter: { H: "#4a2c1a", C: "#8e44ad", P: "#f5d76e" },
+  ads_specialist: { H: "#1f3a5f", C: "#16a085", P: "#e67e22", glasses: true },
 };
 
 export function PixelAvatar({ role, size = 48 }: { role: string; size?: number }) {

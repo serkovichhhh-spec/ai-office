@@ -32,7 +32,7 @@ const BriefInput = z.object({
   objective: z.string().trim().min(10, "Опишіть мету хоча б одним реченням").max(4000),
   audience: z.string().trim().max(2000),
   channel: z.string().trim().max(200),
-  deliverable_count: z.coerce.number().int().min(1).max(10),
+  deliverable_count: z.coerce.number().int().min(1).max(100),
   deadline: z.string().regex(/^(\d{4}-\d{2}-\d{2})?$/),
   priority: z.enum(["low", "medium", "high"]),
 });
@@ -43,14 +43,29 @@ export async function submitBriefAction(_prev: ActionState, form: FormData): Pro
   const parsed = BriefInput.safeParse(Object.fromEntries(form));
   if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Перевірте поля брифу" };
   const v = parsed.data;
-  const pb = PLAYBOOK_CATALOG.find((p) => p.key === String(form.get("playbook_key") ?? "reels_concepts"));
+  const pb = PLAYBOOK_CATALOG.find((p) => p.key === String(form.get("playbook_key") ?? "") && p.version === Number(form.get("playbook_version") ?? 0))
+    ?? PLAYBOOK_CATALOG.find((p) => p.key === String(form.get("playbook_key") ?? ""));
   if (!pb) return { error: "Невідомий тип задачі" };
-  const fields: Record<string, string | string[]> = {};
+  if (v.deliverable_count > pb.maxCount) return { error: `Для цього типу задачі — не більше ${pb.maxCount} результатів` };
+  const fields: Record<string, string | number | string[]> = {};
   for (const f of pb.fields) {
-    const raw = String(form.get(`f_${f.key}`) ?? "").trim().slice(0, f.maxLength ?? 2000);
+    const name = `f_${f.key}`;
+    if (f.type === "knowledge_multi" || f.type === "knowledge") {
+      // Missing knowledge never blocks the form: the team returns precise questions instead.
+      const ids = form.getAll(name).map(String).filter((x) => /^[0-9a-f-]{36}$/i.test(x)).slice(0, 30);
+      if (ids.length) fields[f.key] = f.type === "knowledge" ? ids[0] : ids;
+      continue;
+    }
+    const raw = String(form.get(name) ?? "").trim().slice(0, f.type === "list" ? 4000 : f.maxLength ?? 2000);
     if (f.required && !raw) return { error: `Заповніть поле «${f.label}»` };
-    if (f.type === "select" && raw && !f.options?.some((o) => o.value === raw)) return { error: `Невірне значення: ${f.label}` };
-    if (raw) fields[f.key] = f.type === "list" ? lines(raw) : f.type === "select" ? (f.options?.find((o) => o.value === raw)?.label ?? raw) : raw;
+    if (!raw) continue;
+    if (f.type === "select" && !f.options?.some((o) => o.value === raw)) return { error: `Невірне значення: ${f.label}` };
+    if (f.type === "number") {
+      const num = Number(raw);
+      if (!Number.isFinite(num) || (f.min !== undefined && num < f.min) || (f.max !== undefined && num > f.max)) return { error: `Невірне число: ${f.label}` };
+      fields[f.key] = num;
+    } else if (f.type === "datetime") fields[f.key] = `${raw} (Europe/Kyiv)`;
+    else fields[f.key] = f.type === "list" ? lines(raw) : raw;
   }
   let runId: string;
   try {
@@ -69,6 +84,7 @@ export async function submitBriefAction(_prev: ActionState, form: FormData): Pro
         acceptance_criteria: lines(form.get("acceptance_criteria")),
         references: lines(form.get("references")),
         playbook_key: pb.key,
+        playbook_version: pb.version,
         fields,
       })}) as id`;
       const [{ id }] = await tx<{ id: string }[]>`select office.submit_brief(${briefId}, ${v.idempotency_key}) as id`;

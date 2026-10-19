@@ -1,7 +1,7 @@
 import { Fragment } from "react";
 import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/supabase";
-import { runDetail, stepLabel, workspaceBySlug, type RunDetail } from "@/lib/queries";
+import { listKnowledge, runDetail, stepLabel, workspaceBySlug, type RunDetail } from "@/lib/queries";
 import { LiveRefresh } from "../../../../components/LiveRefresh";
 import { HANDOFF_STATUS, ROLE_LABEL, STEP_STATUS, ProviderBadge, StatusPill, StubBadge, clock, modelLabel, usd, when } from "../../../../components/ui";
 import { EXECUTOR_LABEL } from "@/lib/queries";
@@ -9,6 +9,7 @@ import { cancelRunAction } from "../../../../actions";
 import { DecisionPanel } from "./DecisionPanel";
 import { PackageView, SectionView, type PackageV1 } from "./PackageView";
 import { PLAYBOOKS } from "@/lib/orchestrator/registry";
+import { ENUM_LABEL } from "@/lib/orchestrator/catalog";
 
 export const dynamic = "force-dynamic";
 
@@ -66,10 +67,13 @@ export default async function RunPage({ params }: { params: Promise<{ slug: stri
   const canDecide = d.run.status === "needs_approval" && (ws.role === "owner" || ws.role === "approver");
   const canCancel = ["queued", "running", "needs_input", "needs_approval"].includes(d.run.status) && ws.role !== "viewer";
   const draftScripts = !latest ? (d.artifacts.filter((a) => a.kind === "scripts").at(-1)?.content as { scripts?: Script[] } | undefined) : undefined;
-  const spec = PLAYBOOKS[d.brief.playbook_key]?.spec;
+  const pb = PLAYBOOKS[`${d.brief.playbook_key}@${d.run.playbook_version ?? 1}`];
+  const spec = pb?.catalog;
+  const kTitles = new Map((spec?.fields.some((f) => f.type.startsWith("knowledge")) ? await listKnowledge(user.id, ws.id) : []).map((k) => [k.id, k.title]));
+  const showField = (v: unknown): string => (Array.isArray(v) ? v.map(showField).join(", ") : kTitles.get(String(v)) ?? ENUM_LABEL[String(v)] ?? String(v));
   const pkgV1 = latest && (latest.content as { schema_version?: string }).schema_version === "Package.v1" ? (latest.content as unknown as PackageV1) : null;
-  const specDraft = !latest && spec
-    ? spec.steps.map((s) => ({ s, a: d.artifacts.filter((a) => a.kind === s.key).at(-1) })).filter((x) => x.a).at(-1)
+  const specDraft = !latest && pb?.stepTitles && d.brief.playbook_key !== "reels_concepts" || (!latest && (d.run.playbook_version ?? 1) > 1)
+    ? Object.entries(pb?.stepTitles ?? {}).map(([key, title]) => ({ s: { key, title }, a: d.artifacts.filter((a) => a.kind === key).at(-1) })).filter((x) => x.a).at(-1)
     : undefined;
   const content = (pkgV1 ? null : latest?.content ?? null) as null | {
     strategy_summary: string; angles: Angle[]; scripts: Script[];
@@ -122,7 +126,7 @@ export default async function RunPage({ params }: { params: Promise<{ slug: stri
         <div>
           {canDecide && latest && (
             <div className="mobile-first-decision">
-              <DecisionPanel artifactId={latest.id} version={latest.version} />
+              <DecisionPanel artifactId={latest.id} version={latest.version} canApprove={!pkgV1?.outcome || pkgV1.outcome === "ready_for_approval"} />
             </div>
           )}
 
@@ -135,7 +139,7 @@ export default async function RunPage({ params }: { params: Promise<{ slug: stri
             {specDraft?.a && (
               <>
                 <p className="muted small" style={{ marginBottom: 10 }}>Проміжний результат «{specDraft.s.title}», ще не пройшов рев'ю:</p>
-                <SectionView content={specDraft.a.content} />
+                <SectionView content={specDraft.a.content as Record<string, unknown>} />
               </>
             )}
             {!content && !pkgV1 && !specDraft && !draftScripts && <p className="empty">{active ? "Команда працює — результат з’явиться тут." : "Результату немає."}</p>}
@@ -208,7 +212,7 @@ export default async function RunPage({ params }: { params: Promise<{ slug: stri
         </div>
 
         <div>
-          {canDecide && latest && <div className="desktop-decision"><DecisionPanel artifactId={latest.id} version={latest.version} /></div>}
+          {canDecide && latest && <div className="desktop-decision"><DecisionPanel artifactId={latest.id} version={latest.version} canApprove={!pkgV1?.outcome || pkgV1.outcome === "ready_for_approval"} /></div>}
 
           {d.handoff && (
             <section className="panel">
@@ -230,8 +234,8 @@ export default async function RunPage({ params }: { params: Promise<{ slug: stri
               <dt className="muted">Варіантів</dt><dd style={{ margin: 0 }}>{d.brief.deliverable_count}</dd>
               {d.brief.deadline && (<><dt className="muted">Дедлайн</dt><dd style={{ margin: 0 }}>{d.brief.deadline}</dd></>)}
               {spec && (<><dt className="muted">Тип задачі</dt><dd style={{ margin: 0 }}>{spec.label}</dd></>)}
-              {spec?.briefFields.map((f) => d.brief.fields?.[f.key] ? (
-                <Fragment key={f.key}><dt className="muted">{f.label}</dt><dd style={{ margin: 0, whiteSpace: "pre-line" }}>{String(d.brief.fields[f.key])}</dd></Fragment>
+              {spec?.fields.map((f) => d.brief.fields?.[f.key] !== undefined && d.brief.fields[f.key] !== "" ? (
+                <Fragment key={f.key}><dt className="muted">{f.label}</dt><dd style={{ margin: 0, whiteSpace: "pre-line" }}>{showField(d.brief.fields[f.key])}</dd></Fragment>
               ) : null)}
             </dl>
             {d.brief.acceptance_criteria.length > 0 && (
