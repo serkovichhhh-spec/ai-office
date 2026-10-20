@@ -9,6 +9,7 @@ import { createHash } from "node:crypto";
 import { z } from "zod";
 import type { Sql } from "../db-core";
 import { OUTPUT_SCHEMAS } from "../orchestrator/registry";
+import { attachCmoSkill, needsCmoSkill } from "../orchestrator/skills";
 
 export const SUPPORTED_PROTOCOL_VERSIONS = ["2025-11-25", "2025-06-18", "2025-03-26", "2024-11-05"];
 export const SERVER_INFO = { name: "ai-office", title: "AI Office", version: "1.0.0" };
@@ -122,6 +123,14 @@ function toolResult(data: Json, isError = false) {
   return { content: [{ type: "text", text: JSON.stringify(data, null, 2) }], structuredContent: data, isError };
 }
 
+async function enrichEnvelope(ctx: McpContext, envelope: Json): Promise<Json> {
+  if (!needsCmoSkill(envelope)) return envelope;
+  // Called only AFTER gateway_get/claim has authorised this task for this executor.
+  // Reuse the worker's existing authorised server capability; no new DB function or MCP tool.
+  const context = await call(ctx.sql, "worker_context", [envelope.task_id]) as { workspace: { slug: string } };
+  return attachCmoSkill(envelope, context.workspace.slug);
+}
+
 function pgCode(e: unknown): string | undefined {
   return (e as { code?: string })?.code;
 }
@@ -137,7 +146,7 @@ export async function runTool(ctx: McpContext, name: string, rawArgs: unknown) {
       }
       case "office_get_task": {
         const { task_id } = z.object({ task_id: TaskId }).parse(args);
-        return toolResult((await call(ctx.sql, "gateway_get", [ctx.tokenHash, task_id])) as Json);
+        return toolResult(await enrichEnvelope(ctx, (await call(ctx.sql, "gateway_get", [ctx.tokenHash, task_id])) as Json));
       }
       case "office_claim_task": {
         const a = z.object({ task_id: TaskId.optional(), attempt_id: z.string().uuid().optional(), lease_token: z.string().optional() }).parse(args);
@@ -145,6 +154,7 @@ export async function runTool(ctx: McpContext, name: string, rawArgs: unknown) {
           return toolResult((await call(ctx.sql, "gateway_renew", [ctx.tokenHash, a.attempt_id, a.lease_token])) as Json);
         }
         const r = (await call(ctx.sql, "gateway_claim", [ctx.tokenHash, a.task_id ?? null])) as Json;
+        if (r.envelope) r.envelope = await enrichEnvelope(ctx, r.envelope as Json);
         return toolResult(r);
       }
       case "office_submit_result": {

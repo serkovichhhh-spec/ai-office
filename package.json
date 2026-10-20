@@ -12,7 +12,7 @@
     "start": "next start",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:sql": "bash tests/sql/run.sh",
+    "test:sql": "tsx tests/sql/run.ts",
     "test:e2e-local": "tsx scripts/e2e-local.ts",
     "test:e2e-mcp": "tsx scripts/e2e-mcp.ts"
   },

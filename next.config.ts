@@ -3,6 +3,7 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   poweredByHeader: false,
   serverExternalPackages: ["postgres"],
+  outputFileTracingIncludes: { "/api/mcp": ["./skills/cmo/**/*"] },
   async rewrites() {
     return [
       { source: "/.well-known/oauth-protected-resource", destination: "/api/oauth/metadata/protected-resource" },

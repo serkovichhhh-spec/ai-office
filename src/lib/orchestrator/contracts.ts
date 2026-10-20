@@ -9,18 +9,21 @@ import { z } from "zod";
 import schemas from "./library/schemas.json";
 
 type JS = Record<string, unknown>;
+export const ROUND2_CONTRACTS = ["BriefDiagnosis", "WorkPlan", "KnowledgeCandidate", "FactReport", "ChallengeReport", "DecisionMemo", "BrainstormSession", "BrainstormTurn", "BrainstormDecision"] as const;
 const DEFS = (schemas as { $defs: Record<string, JS> }).$defs;
 const SCHEMA_ID = (schemas as { $id?: string }).$id ?? "https://ai-office.invalid/schemas.json";
+const canonical = (name: string) => name.endsWith(".v1") && ROUND2_CONTRACTS.some((n) => `${n}.v1` === name) ? name.slice(0, -3) : name;
 
 const ajv = new Ajv2020({ allErrors: true, strict: false, validateFormats: false });
 ajv.addSchema(schemas as JS);
 
 export function hasContract(def: string): boolean {
-  return def in DEFS;
+  return canonical(def) in DEFS;
 }
 
 /** Self-contained schema: {$ref, $defs: transitive closure}. */
 export function bundle(def: string): JS {
+  def = canonical(def);
   if (!DEFS[def]) throw new Error(`unknown contract ${def}`);
   const needed = new Set<string>();
   const visit = (node: unknown) => {
@@ -49,6 +52,7 @@ export interface SemanticCheck {
 
 /** zod schema whose validation is Ajv (structure) + optional semantic checks (counts, consistency). */
 export function contract<T = Record<string, unknown>>(def: string, semantic?: SemanticCheck): z.ZodType<T> {
+  def = canonical(def);
   const validate = ajv.getSchema(`${SCHEMA_ID}#/$defs/${def}`);
   if (!validate) throw new Error(`unknown contract ${def}`);
   return z.any().superRefine((v, ctx) => {

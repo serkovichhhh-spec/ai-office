@@ -2,10 +2,11 @@
 // (src/lib/orchestrator/contracts.ts). Usage: node validate.mjs <path-to-ai-office>
 import { createRequire } from "node:module";
 import { readFileSync, writeFileSync } from "node:fs";
-import { join, dirname } from "node:path";
+import { join, dirname, resolve } from "node:path";
+import { isDeepStrictEqual } from "node:util";
 import { fileURLToPath } from "node:url";
 
-const repo = process.argv[2];
+const repo = resolve(process.argv[2] ?? ".");
 const here = dirname(fileURLToPath(import.meta.url));
 const require = createRequire(join(repo, "package.json"));
 const Ajv2020 = require("ajv/dist/2020.js").default ?? require("ajv/dist/2020.js");
@@ -14,7 +15,8 @@ const lib = JSON.parse(readFileSync(join(repo, "src/lib/orchestrator/library/sch
 const add = JSON.parse(readFileSync(join(here, "schemas.additions.json"), "utf8"));
 const examples = JSON.parse(readFileSync(join(here, "examples.json"), "utf8"));
 
-const clash = Object.keys(add.$defs).filter((k) => k in lib.$defs);
+// Already integrated definitions are allowed only when identical to the reviewed source.
+const clash = Object.keys(add.$defs).filter((k) => k in lib.$defs && !isDeepStrictEqual(lib.$defs[k], add.$defs[k]));
 if (clash.length) { console.error("NAME CLASH with existing $defs:", clash); process.exit(1); }
 
 const merged = { ...lib, $defs: { ...lib.$defs, ...add.$defs } };
