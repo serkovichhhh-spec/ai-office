@@ -1,6 +1,7 @@
 -- DRAFT ONLY. Intentionally outside migrations/: do not apply to Supabase.
 -- Local acceptance tests explicitly load this file after migrations 0001..0008.
--- Additive: existing functions, columns, statuses and approval records are preserved.
+-- No removals/renames. Existing function signatures and P0 governance are preserved;
+-- worker_context/gateway policy/submit additionally enforce knowledge expiry.
 
 alter table office.knowledge_docs add column valid_until date;
 grant update (valid_until) on office.knowledge_docs to authenticated;
@@ -11,6 +12,7 @@ create table office.knowledge_candidates (
   id uuid primary key default gen_random_uuid(),
   workspace_id uuid not null references office.workspaces(id),
   research_artifact_id uuid not null references office.artifacts(id),
+  source_index int not null default 0 check (source_index >= 0),
   kind text not null check (kind in ('fact','market','insight','case','argument','result','rejected_idea','taste_rule')),
   title text not null check (length(title) between 5 and 200),
   claim text not null check (length(claim) between 10 and 2000),
@@ -22,10 +24,12 @@ create table office.knowledge_candidates (
   data_class text not null default 'internal' check (data_class in ('public','internal','confidential')),
   status text not null default 'candidate' check (status in ('candidate','approved','rejected')),
   approved_doc_id uuid unique references office.knowledge_docs(id),
-  created_by uuid not null default auth.uid() references auth.users(id),
+  created_by uuid default auth.uid() references auth.users(id),
   reviewed_by uuid references auth.users(id),
   created_at timestamptz not null default now(),
   reviewed_at timestamptz,
+  review_note text not null default '' check (length(review_note) <= 2000),
+  unique (research_artifact_id, source_index),
   check (confidence <> 'assumption' or owner_question is not null),
   check (confidence = 'assumption' or jsonb_array_length(sources) > 0),
   check ((status = 'candidate' and reviewed_by is null and reviewed_at is null and approved_doc_id is null)
@@ -42,23 +46,27 @@ create policy candidates_update on office.knowledge_candidates for update to aut
   using (office.has_role(workspace_id, array['owner','editor']))
   with check (office.has_role(workspace_id, array['owner','editor']));
 grant select, insert on office.knowledge_candidates to authenticated;
-grant update (title, claim, confidence, sources, why_it_matters, owner_question, valid_until, data_class, status)
+grant update (title, claim, confidence, sources, why_it_matters, owner_question, valid_until, data_class)
   on office.knowledge_candidates to authenticated;
 
 -- Invoker rights: promotion uses the owner's existing Knowledge Hub INSERT permission.
 create function office.guard_knowledge_candidate() returns trigger
 language plpgsql set search_path = '' as $$
-declare source_run uuid;
+declare source_run uuid; source jsonb;
 begin
   if tg_op = 'INSERT' then
     if new.status <> 'candidate' or new.approved_doc_id is not null or new.reviewed_by is not null or new.reviewed_at is not null then
       raise exception 'research must start as candidate' using errcode = '42501';
     end if;
     new.created_by := auth.uid();
+    if new.created_by is null and pg_trigger_depth() < 2 then
+      raise exception 'system candidates must originate in an artifact trigger' using errcode = '42501';
+    end if;
     new.created_at := now();
   else
     if old.status <> 'candidate' then raise exception 'reviewed candidate is immutable' using errcode = '42501'; end if;
-    if new.workspace_id is distinct from old.workspace_id or new.research_artifact_id is distinct from old.research_artifact_id
+    if new.id is distinct from old.id or new.source_index is distinct from old.source_index
+       or new.workspace_id is distinct from old.workspace_id or new.research_artifact_id is distinct from old.research_artifact_id
        or new.created_by is distinct from old.created_by or new.created_at is distinct from old.created_at
        or new.approved_doc_id is distinct from old.approved_doc_id or new.reviewed_by is distinct from old.reviewed_by
        or new.reviewed_at is distinct from old.reviewed_at then
@@ -75,6 +83,10 @@ begin
       or coalesce(s->>'accessed_at', '') !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$') then
     raise exception 'invalid research sources' using errcode = '23514';
   end if;
+  for source in select value from jsonb_array_elements(new.sources) loop
+    perform (source->>'accessed_at')::date;
+    if source->>'published_at' is not null then perform (source->>'published_at')::date; end if;
+  end loop;
   if new.status <> 'candidate' then
     if not office.has_role(new.workspace_id, array['owner']) then
       raise exception 'only owner may review research candidates' using errcode = '42501';
@@ -92,6 +104,8 @@ begin
     end if;
   end if;
   return new;
+exception when invalid_datetime_format or datetime_field_overflow then
+  raise exception 'invalid source date' using errcode='23514';
 end $$;
 create trigger knowledge_candidate_guard before insert or update on office.knowledge_candidates
   for each row execute function office.guard_knowledge_candidate();
@@ -172,3 +186,196 @@ begin
 end $$;
 create trigger approval_target_guard before insert on office.approvals for each row execute function office.guard_approval_target();
 revoke all on function office.guard_approval_target() from public, anon, authenticated, office_app;
+
+-- Trigger runs inside worker_complete's transaction and rights. No external writer is added.
+create function office.stage_research_artifact() returns trigger
+language plpgsql set search_path = '' as $$
+declare candidate jsonb; entry jsonb; ordinal int := 0; claim_text text; retrieved date; class_floor text;
+begin
+  if not exists (select 1 from office.steps s join office.workspaces w on w.id=s.workspace_id
+      where s.id=new.step_id and s.agent_role='research_analyst' and s.workspace_id=new.workspace_id and s.run_id=new.run_id
+        and w.slug='pavutyna') then return new; end if;
+  select coalesce(s.agent_request->'governance'->>'data_class','internal') into class_floor from office.steps s where s.id=new.step_id;
+  if new.content->>'schema_version' = 'KnowledgeCandidate.v1' then
+    if jsonb_typeof(new.content->'candidates') is distinct from 'array' then raise exception 'invalid candidates' using errcode='23514'; end if;
+    if jsonb_array_length(new.content->'candidates')>12 then raise exception 'too many candidates' using errcode='23514'; end if;
+    for candidate in select value from jsonb_array_elements(new.content->'candidates') loop
+      ordinal := ordinal+1;
+      insert into office.knowledge_candidates(workspace_id,research_artifact_id,source_index,kind,title,claim,confidence,sources,why_it_matters,owner_question,valid_until,data_class)
+        values(new.workspace_id,new.id,ordinal,candidate->>'kind',candidate->>'title',candidate->>'claim',candidate->>'confidence',
+          candidate->'sources',candidate->>'why_it_matters',candidate->>'owner_question',nullif(candidate->>'valid_until','')::date,
+          case when office.data_class_rank(class_floor)>office.data_class_rank(candidate->>'data_class') then class_floor else candidate->>'data_class' end);
+    end loop;
+  elsif jsonb_typeof(new.content->'research_candidates')='array' then
+    -- Legacy ResearchCandidate format. Keep unverified/invalid-source suggestions as
+    -- assumptions instead of inventing provenance or granting verified status.
+    for entry in select value from jsonb_array_elements(new.content->'research_candidates') loop
+      ordinal := ordinal+1;
+      claim_text := entry->>'proposed_fact';
+      retrieved := null;
+      begin
+        retrieved := left(entry->>'retrieved_at',10)::date;
+      exception when invalid_datetime_format or datetime_field_overflow then retrieved := null;
+      end;
+      if entry->>'url' ~ '^https?://[^[:space:]]+$' and retrieved is not null and length(claim_text)>=10 then
+        candidate := jsonb_build_object('confidence','reported','sources',jsonb_build_array(jsonb_build_object(
+          'url',entry->>'url','title',left('Джерело: ' || new.title,200),'accessed_at',retrieved,'quote',entry->>'excerpt')));
+      else
+        candidate := '{"confidence":"assumption","sources":[]}'::jsonb;
+      end if;
+      -- Schema-valid legacy claims may be short; preserve the original verbatim in
+      -- the artifact and give the staging claim an explicit label.
+      if length(coalesce(claim_text,''))<10 then claim_text := 'Потребує перевірки: ' || coalesce(claim_text,''); end if;
+      insert into office.knowledge_candidates(workspace_id,research_artifact_id,source_index,kind,title,claim,confidence,sources,why_it_matters,owner_question,data_class)
+        values(new.workspace_id,new.id,ordinal,'fact',left('Дослідження: ' || claim_text,200),left(claim_text,2000),candidate->>'confidence',candidate->'sources',
+          'Пропозиція дослідника: перевірте твердження та першоджерело.',
+          case when candidate->>'confidence'='assumption' then 'Потрібне придатне першоджерело для цього твердження.' end,
+          class_floor);
+    end loop;
+  end if;
+  return new;
+end $$;
+create trigger research_artifact_candidates after insert on office.artifacts for each row execute function office.stage_research_artifact();
+revoke all on function office.stage_research_artifact() from public,anon,authenticated,service_role,office_app;
+
+-- The sole terminal-state writer: owner checked before locking; duplicate clicks are
+-- idempotent for the same decision and rejected for a conflicting decision.
+create function office.review_knowledge_candidate(p_id uuid,p_decision text,p_valid_until date,p_note text,p_expected_hash text default null) returns uuid
+language plpgsql security definer set search_path = '' as $$
+declare c office.knowledge_candidates; a office.artifacts;
+begin
+  select * into c from office.knowledge_candidates where id=p_id;
+  if not found or not office.has_role(c.workspace_id,array['owner']) then
+    raise exception 'only owner may review research candidates' using errcode='42501';
+  end if;
+  select * into c from office.knowledge_candidates where id=p_id for update;
+  if p_decision is null or p_decision not in ('approved','rejected') then raise exception 'invalid decision' using errcode='22023'; end if;
+  if c.status = p_decision then return c.approved_doc_id; end if;
+  if c.status <> 'candidate' then raise exception 'candidate already reviewed' using errcode='55000'; end if;
+  if p_expected_hash is not null and p_expected_hash <> md5(to_jsonb(c)::text) then
+    raise exception 'candidate changed since review' using errcode='55000';
+  end if;
+  if length(coalesce(p_note,''))>2000 then raise exception 'review note too long' using errcode='22023'; end if;
+  if p_decision='approved' and (p_valid_until is null or p_valid_until < (now() at time zone 'Europe/Kyiv')::date) then
+    raise exception 'approval requires an unexpired validity date' using errcode='23514';
+  end if;
+  if p_decision='rejected' and length(trim(coalesce(p_note,'')))=0 then raise exception 'rejection needs a comment' using errcode='22023'; end if;
+  update office.knowledge_candidates set status=p_decision,
+    valid_until=case when p_decision='approved' then p_valid_until else valid_until end,review_note=coalesce(p_note,'') where id=p_id;
+  select * into c from office.knowledge_candidates where id=p_id;
+  select * into a from office.artifacts where id=c.research_artifact_id;
+  insert into office.approvals(workspace_id,run_id,artifact_id,artifact_hash,decision,rationale,approver_id,scope,target_id)
+    values(c.workspace_id,a.run_id,a.id,a.content_hash,p_decision,coalesce(p_note,''),auth.uid(),'knowledge_candidate',c.id);
+  perform office.log_event(c.workspace_id,a.run_id,a.step_id,'user',auth.uid(),'research_analyst','knowledge.' || p_decision,'idle',
+    jsonb_build_object('candidate_id',c.id,'knowledge_id',c.approved_doc_id));
+  return c.approved_doc_id;
+end $$;
+revoke all on function office.review_knowledge_candidate(uuid,text,date,text,text) from public,anon,service_role,office_app;
+grant execute on function office.review_knowledge_candidate(uuid,text,date,text,text) to authenticated;
+
+-- Expiry is enforced even if general provider governance has been disabled.
+create or replace function office.gateway_policy_ok(e office.executors,s office.steps) returns boolean
+language sql stable security definer set search_path = '' as $$
+  select (not coalesce((office.setting(s.workspace_id,'governance_enforced'))::boolean,true)
+      or e.provider='human' or (office.provider_max_class(e.provider) is not null
+        and office.data_class_rank(coalesce(s.agent_request->'governance'->>'data_class','internal')) <= office.data_class_rank(office.provider_max_class(e.provider))))
+    and not exists(select 1 from jsonb_array_elements(coalesce(s.agent_request->'governance'->'knowledge_refs','[]'::jsonb)) ref
+      join office.knowledge_docs k on k.id::text=ref->>'record_id' and k.workspace_id=s.workspace_id
+      where k.valid_until < (now() at time zone 'Europe/Kyiv')::date);
+$$;
+
+-- Same P0 provider governance; additionally omit expired knowledge from content AND refs.
+create or replace function office.worker_context(p_step uuid) returns jsonb
+language sql stable security definer set search_path = '' as $$
+  with base as (
+    select s, r, b, w,
+           (select to_jsonb(a) from office.agents a where a.workspace_id = s.workspace_id and a.role_key = s.agent_role) as agent,
+           office.provider_for_kind(coalesce(s.executor,
+             (select a.default_executor from office.agents a where a.workspace_id = s.workspace_id and a.role_key = s.agent_role),
+             'claude_session')) as provider,
+           coalesce((office.setting(s.workspace_id, 'governance_enforced'))::boolean, true) as enforced
+    from office.steps s join office.runs r on r.id = s.run_id join office.briefs b on b.id = r.brief_id
+    join office.workspaces w on w.id = s.workspace_id
+    where s.id = p_step
+  ), lim as (
+    select base.*, office.provider_max_class(provider) as max_class from base
+  ), kn as (
+    select k.id, k.title, k.kind, k.body, k.source_url, k.freshness_date, k.data_class, k.valid_until,
+           office.knowledge_version(k) as version,
+           (not lim.enforced
+                 or (lim.max_class is not null and office.data_class_rank(k.data_class) <= office.data_class_rank(lim.max_class)
+                     and k.data_class <> 'personal')) as allowed
+    from lim join office.knowledge_docs k on k.workspace_id = (lim.s).workspace_id and k.status = 'approved'
+      and (k.valid_until is null or k.valid_until >= (now() at time zone 'Europe/Kyiv')::date)
+  )
+  select jsonb_build_object(
+    'step', to_jsonb(lim.s),
+    'run', to_jsonb(lim.r),
+    'brief', to_jsonb(lim.b),
+    'workspace', jsonb_build_object('id', (lim.w).id, 'slug', (lim.w).slug, 'name', (lim.w).name),
+    'agent', lim.agent,
+    'knowledge', coalesce((select jsonb_agg(jsonb_build_object('id', k.id, 'version', k.version,
+                                                               'title', k.title, 'kind', k.kind, 'body', k.body,
+                                                               'source_url', k.source_url, 'freshness_date', k.freshness_date,
+                                                               'data_class', k.data_class, 'valid_until', k.valid_until)
+                                            order by k.kind, k.title)
+                           from kn k where k.allowed), '[]'::jsonb),
+    'artifacts', coalesce((select jsonb_agg(jsonb_build_object('kind', x.kind, 'version', x.version, 'content', x.content,
+                                                               'id', x.id, 'hash', x.content_hash)
+                                            order by x.kind, x.version)
+                           from office.artifacts x where x.run_id = (lim.s).run_id), '[]'::jsonb),
+    'governance', jsonb_build_object(
+       'provider', lim.provider,
+       'max_data_class', lim.max_class,
+       'enforced', lim.enforced,
+       -- The brief and artifacts are internal by default, so the envelope is never below internal.
+       'data_class', (select u.c from (select k.data_class as c from kn k where k.allowed union all select 'internal') u
+                      order by office.data_class_rank(u.c) desc limit 1),
+       'knowledge_refs', coalesce((select jsonb_agg(jsonb_build_object('record_id', k.id,
+                                     'version', k.version, 'data_class', k.data_class)
+                                     order by k.title) from kn k where k.allowed), '[]'::jsonb),
+       'excluded_count', (select count(*) from kn k where not k.allowed))
+  )
+  from lim
+$$;
+
+-- An answer based on expired inputs stays a proposal, including direct gateway callers.
+create or replace function office.gateway_submit(p_token_hash text, p_attempt uuid, p_lease_token text, p_result jsonb) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare e office.executors; a office.execution_attempts; s office.steps; v_reason text;
+begin
+  e := office.gateway_executor(p_token_hash, 'submit');
+  if jsonb_typeof(p_result) <> 'object' then raise exception 'result must be a JSON object' using errcode = '22023'; end if;
+  select * into a from office.execution_attempts where id = p_attempt for update;
+  if not found or a.executor_id <> e.id or a.lease_token_hash <> encode(sha256(convert_to(p_lease_token, 'UTF8')), 'hex') then
+    raise exception 'attempt not found' using errcode = 'P0002';
+  end if;
+  if a.state not in ('claimed','expired') then
+    return jsonb_build_object('accepted', false, 'reason', 'attempt_' || a.state);
+  end if;
+  select * into s from office.steps where id = a.step_id for update;
+
+  if a.lease_expires_at < now() then v_reason := 'lease_expired';
+  elsif not office.gateway_policy_ok(e,s) then v_reason := 'knowledge_expired_or_disallowed';
+  elsif s.status <> 'awaiting_agent' then v_reason := 'task_no_longer_waiting';
+  elsif office.run_input_hashes(s.run_id) <> a.input_hashes then v_reason := 'inputs_changed';
+  end if;
+
+  if v_reason is not null then
+    update office.execution_attempts set state = 'rejected', rejection_reason = v_reason, result = p_result, submitted_at = now()
+    where id = a.id;
+    perform office.log_event(s.workspace_id, s.run_id, s.id, 'agent', null, s.agent_role, 'attempt.saved_as_proposal', 'idle',
+      jsonb_build_object('attempt_id', a.id, 'reason', v_reason, 'executor', e.kind, 'executor_id', e.id, 'executor_label', e.label));
+    return jsonb_build_object('accepted', false, 'reason', v_reason, 'saved_as_proposal', true);
+  end if;
+
+  update office.execution_attempts set state = 'submitted', result = p_result, submitted_at = now() where id = a.id;
+  update office.steps set status = 'ready', next_attempt_at = now(), agent_response = jsonb_build_object(
+      'schemaName', s.agent_request->>'schemaName', 'output', p_result, 'submitted_at', now(),
+      'attempt_id', a.id, 'executor', e.kind, 'executor_id', e.id, 'executor_label', e.label)
+  where id = s.id;
+  perform office.log_event(s.workspace_id, s.run_id, s.id, 'agent', null, s.agent_role, 'step.agent_submitted',
+    office.activity_for_role(s.agent_role), jsonb_build_object('step', s.step_key, 'attempt_id', a.id, 'executor', e.kind,
+      'executor_name', e.name, 'executor_id', e.id, 'executor_label', e.label));
+  return jsonb_build_object('accepted', true, 'next', 'AI Office перевірить відповідь за схемою протягом ~1 хв');
+end $$;

@@ -17,7 +17,7 @@ export function needsCmoSkill(envelope: Record<string, unknown>): boolean {
 }
 
 /** Fixed server-owned paths; executors cannot choose a pack or a workspace context. */
-export async function attachCmoSkill<T extends Record<string, unknown>>(envelope: T, workspaceSlug: string, root = process.cwd()): Promise<T & {
+export async function attachCmoSkill<T extends Record<string, unknown>>(envelope: T, workspaceSlug: string, root = process.cwd(), liveContext?: string): Promise<T & {
   skills?: SkillAttachment[];
   context?: { file: string; version: string; text: string; data_class: string };
 }> {
@@ -30,6 +30,6 @@ export async function attachCmoSkill<T extends Record<string, unknown>>(envelope
   const sha256 = digest(JSON.stringify(Object.entries(files).sort(([a], [b]) => a.localeCompare(b))));
   const result = { ...envelope, skills: [{ key: "cmo", version: "1.0.0", sha256, files }] };
   const file = "context/pavutyna.md";
-  const text = await read(file);
+  const text = liveContext ?? await read(file);
   return { ...result, context: { file, version: digest(text), text, data_class: "internal" } };
 }

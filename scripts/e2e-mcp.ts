@@ -39,6 +39,9 @@ async function main() {
     for (const f of ["tests/sql/00_supabase_shim.sql", ...readdirSync(join(ROOT, "supabase/migrations")).sort().map((f) => `supabase/migrations/${f}`)]) {
       await su.unsafe(readFileSync(join(ROOT, f), "utf8"));
     }
+    if (process.env.E2E_DRAFT_0009 === "1") {
+      await su.unsafe(readFileSync(join(ROOT, "supabase/drafts/0009_office_research_concepts.sql"), "utf8"));
+    }
     await su.unsafe(`alter role office_app login password 'e2e-local-only'`);
     await su`insert into auth.users (id, email) values (${OWNER}, 'owner@example.test')`;
     await su`insert into office.workspace_members (workspace_id, user_id, role) select id, ${OWNER}, 'owner' from office.workspaces where slug = 'pavutyna'`;
@@ -178,8 +181,13 @@ async function main() {
     const lExec = await su`select step_key, executor from office.steps where run_id = ${lRun} and executor is not null order by created_at`;
     check("library run: executors from the playbook (claude, claude, chatgpt)", lExec.map((x) => x.executor).join(",") === "claude_session,claude_session,chatgpt", lExec);
     // P1: a parked v2 diagnosis uses the same five tools and DB schema 0008.
+    const [liveKnowledge] = await su`insert into office.knowledge_docs(workspace_id,kind,title,body,status,data_class)
+      values(${ws},'fact','Current approved test fact','A fact that belongs to this task.','approved','internal') returning id`;
+    const [unreferenced] = await su`insert into office.knowledge_docs(workspace_id,kind,title,body,status,data_class)
+      values(${ws},'fact','Later knowledge outside this task','Not authorised for this prepared task.','approved','internal') returning id`;
+    const [{ version }] = await su`select office.knowledge_version(k) as version from office.knowledge_docs k where id=${liveKnowledge.id}`;
     const diagnosisRequest = { schemaName: "BriefDiagnosis.v1", system: "CMO diagnosis", user: "Test diagnosis",
-      jsonSchema: bundle("BriefDiagnosis.v1"), governance: { data_class: "internal" } };
+      jsonSchema: bundle("BriefDiagnosis.v1"), governance: { data_class: "internal", knowledge_refs: [{ record_id: liveKnowledge.id, version }] } };
     const [{ id: diagnosis }] = await su`insert into office.steps(run_id, workspace_id, step_key, agent_role, status, executor, agent_request)
       values (${lRun}, ${ws}, 'diagnosis', 'strategist', 'awaiting_agent', 'chatgpt',
         ${su.json(diagnosisRequest as postgres.JSONValue)}) returning id`;
@@ -188,6 +196,8 @@ async function main() {
     check("P1 diagnosis GET includes full skill pack and internal workspace context", fetched.output_schema_name === "BriefDiagnosis.v1" && fetched.skills?.[0]?.key === "cmo"
       && fetched.skills[0].version === "1.0.0" && fetched.skills[0].files["SKILL.md"].length > 100
       && fetched.context?.file === "context/pavutyna.md", fetched.error);
+    check("CMO live context includes only authorised record versions", fetched.context.text.includes(liveKnowledge.id)
+      && fetched.context.text.includes('"record_id"') && !fetched.context.text.includes(unreferenced.id));
     const taken = (await tool(gpt, "office_claim_task", { task_id: diagnosis })).structuredContent;
     check("P1 diagnosis CLAIM carries the same pack hash", taken.claimed === true && taken.envelope.skills?.[0]?.sha256 === fetched.skills?.[0]?.sha256);
     const denied = await tool(other, "office_get_task", { task_id: diagnosis });

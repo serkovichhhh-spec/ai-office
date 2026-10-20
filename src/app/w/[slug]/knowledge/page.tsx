@@ -1,9 +1,10 @@
 import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/supabase";
-import { DATA_CLASS_LABEL, listKnowledge, workspaceBySlug } from "@/lib/queries";
+import { DATA_CLASS_LABEL, listKnowledge, listKnowledgeCandidates, workspaceBySlug } from "@/lib/queries";
 import { when } from "../../../components/ui";
 import { setKnowledgeClassAction, setKnowledgeStatusAction } from "../../../actions";
 import { KnowledgeForm } from "./KnowledgeForm";
+import { ResearchCandidates } from "./ResearchCandidates";
 
 export const dynamic = "force-dynamic";
 
@@ -14,7 +15,10 @@ export default async function KnowledgePage({ params }: { params: Promise<{ slug
   const user = await requireUser();
   const ws = await workspaceBySlug(user.id, slug);
   if (!ws) notFound();
-  const docs = await listKnowledge(user.id, ws.id);
+  const [docs, candidates] = await Promise.all([
+    listKnowledge(user.id, ws.id),
+    slug === "pavutyna" ? listKnowledgeCandidates(user.id, ws.id) : Promise.resolve({ enabled: false, rows: [] }),
+  ]);
   const canEdit = ws.role === "owner" || ws.role === "editor";
   return (
     <div className="cols" style={{ marginTop: 0 }}>
@@ -31,11 +35,12 @@ export default async function KnowledgePage({ params }: { params: Promise<{ slug
               <li key={d.id} style={{ padding: "12px 2px" }}>
                 <div style={{ display: "flex", gap: 10, alignItems: "baseline", justifyContent: "space-between", flexWrap: "wrap" }}>
                   <h3>{d.title} <span className="muted small">{KIND[d.kind]}</span></h3>
-                  <span className={`pill ${d.status === "approved" ? "ok" : "wait"}`}>{d.status === "approved" ? "затверджено" : "чернетка"}</span>
+                  <span className={`pill ${d.status === "approved" && !d.expired ? "ok" : "wait"}`}>{d.expired ? "строк дії минув — агенти не використовують" : d.status === "approved" ? "затверджено" : "чернетка"}</span>
                 </div>
                 <p className="small" style={{ whiteSpace: "pre-wrap", marginTop: 4 }}>{d.body}</p>
                 <p className="small muted" style={{ marginTop: 4 }}>
                   Доступ: {DATA_CLASS_LABEL[d.data_class] ?? d.data_class} · Оновлено {when(d.updated_at)}{d.source_url ? <>, <a href={d.source_url} rel="noreferrer" target="_blank">джерело</a></> : null}
+                  {d.valid_until ? ` · Актуально до ${d.valid_until}` : ""}
                 </p>
                 {canEdit && (
                   <div style={{ display: "flex", gap: 8, marginTop: 6 }}>
@@ -69,6 +74,7 @@ export default async function KnowledgePage({ params }: { params: Promise<{ slug
           <KnowledgeForm workspaceId={ws.id} />
         </section>
       )}
+      {candidates.enabled && <ResearchCandidates rows={candidates.rows} isOwner={ws.role === "owner"} slug={slug} />}
     </div>
   );
 }
