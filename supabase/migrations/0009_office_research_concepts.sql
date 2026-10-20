@@ -1,4 +1,3 @@
--- DRAFT ONLY. Intentionally outside migrations/: do not apply to Supabase.
 -- Local acceptance tests explicitly load this file after migrations 0001..0008.
 -- No removals/renames. Existing function signatures and P0 governance are preserved;
 -- worker_context/gateway policy/submit additionally enforce knowledge expiry.

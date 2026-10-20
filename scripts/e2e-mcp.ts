@@ -39,9 +39,6 @@ async function main() {
     for (const f of ["tests/sql/00_supabase_shim.sql", ...readdirSync(join(ROOT, "supabase/migrations")).sort().map((f) => `supabase/migrations/${f}`)]) {
       await su.unsafe(readFileSync(join(ROOT, f), "utf8"));
     }
-    if (process.env.E2E_DRAFT_0009 === "1") {
-      await su.unsafe(readFileSync(join(ROOT, "supabase/drafts/0009_office_research_concepts.sql"), "utf8"));
-    }
     await su.unsafe(`alter role office_app login password 'e2e-local-only'`);
     await su`insert into auth.users (id, email) values (${OWNER}, 'owner@example.test')`;
     await su`insert into office.workspace_members (workspace_id, user_id, role) select id, ${OWNER}, 'owner' from office.workspaces where slug = 'pavutyna'`;
@@ -212,7 +209,7 @@ async function main() {
     check("P1 invalid diagnosis keeps its lease", stillClaimed.structuredContent.renewed === true);
     const validDiagnosis = await tool(gpt, "office_submit_result", { ...diagnosisLease, result: stubFromJsonSchema(bundle("BriefDiagnosis")) });
     check("P1 corrected diagnosis accepted", validDiagnosis.structuredContent.accepted === true);
-    if (process.env.E2E_DRAFT_0009 === "1") {
+    {
       await su`update office.knowledge_docs set valid_until=current_date-1 where id=${liveKnowledge.id}`;
       const locking = postgres(dbUrl, { max: 1, onnotice: () => {} });
       try {
