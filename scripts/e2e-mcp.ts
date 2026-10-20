@@ -14,6 +14,8 @@ import { SessionProvider } from "../src/lib/ai/session";
 import { StubProvider } from "../src/lib/ai/stub";
 import { tick } from "../src/lib/orchestrator/worker";
 import { AuthError, handleMcpBody, hashToken } from "../src/lib/mcp/server";
+import { bundle } from "../src/lib/orchestrator/contracts";
+import { stubFromJsonSchema } from "../src/lib/orchestrator/stubgen";
 
 const ROOT = join(import.meta.dirname, "..");
 const ADMIN_URL = process.env.E2E_ADMIN_URL ?? "postgres://postgres@localhost:5432/postgres";
@@ -176,18 +178,27 @@ async function main() {
     const lExec = await su`select step_key, executor from office.steps where run_id = ${lRun} and executor is not null order by created_at`;
     check("library run: executors from the playbook (claude, claude, chatgpt)", lExec.map((x) => x.executor).join(",") === "claude_session,claude_session,chatgpt", lExec);
     // P1: a parked v2 diagnosis uses the same five tools and DB schema 0008.
+    const diagnosisRequest = { schemaName: "BriefDiagnosis.v1", system: "CMO diagnosis", user: "Test diagnosis",
+      jsonSchema: bundle("BriefDiagnosis.v1"), governance: { data_class: "internal" } };
     const [{ id: diagnosis }] = await su`insert into office.steps(run_id, workspace_id, step_key, agent_role, status, executor, agent_request)
       values (${lRun}, ${ws}, 'diagnosis', 'strategist', 'awaiting_agent', 'chatgpt',
-        '{"schemaName":"BriefDiagnosis","system":"CMO diagnosis","user":"Test diagnosis","jsonSchema":{"type":"object"},"governance":{"data_class":"internal"}}') returning id`;
+        ${su.json(diagnosisRequest as postgres.JSONValue)}) returning id`;
     await su`update office.runs set status='running' where id=${lRun}`;
     const fetched = (await tool(gpt, "office_get_task", { task_id: diagnosis })).structuredContent;
-    check("P1 diagnosis GET includes full skill pack and internal workspace context", fetched.skills?.[0]?.key === "cmo"
+    check("P1 diagnosis GET includes full skill pack and internal workspace context", fetched.output_schema_name === "BriefDiagnosis.v1" && fetched.skills?.[0]?.key === "cmo"
       && fetched.skills[0].version === "1.0.0" && fetched.skills[0].files["SKILL.md"].length > 100
       && fetched.context?.file === "context/pavutyna.md", fetched.error);
     const taken = (await tool(gpt, "office_claim_task", { task_id: diagnosis })).structuredContent;
     check("P1 diagnosis CLAIM carries the same pack hash", taken.claimed === true && taken.envelope.skills?.[0]?.sha256 === fetched.skills?.[0]?.sha256);
     const denied = await tool(other, "office_get_task", { task_id: diagnosis });
     check("P1 foreign workspace receives no pack or context", denied.isError === true && !denied.structuredContent.skills && !denied.structuredContent.context);
+    const diagnosisLease = { task_id: diagnosis, attempt_id: taken.attempt_id, lease_token: taken.lease_token };
+    const invalidDiagnosis = await tool(gpt, "office_submit_result", { ...diagnosisLease, result: {} });
+    check("P1 diagnosis rejects invalid JSON immediately", invalidDiagnosis.isError === true && invalidDiagnosis.structuredContent.reason === "schema_validation_failed");
+    const stillClaimed = await tool(gpt, "office_claim_task", { attempt_id: taken.attempt_id, lease_token: taken.lease_token });
+    check("P1 invalid diagnosis keeps its lease", stillClaimed.structuredContent.renewed === true);
+    const validDiagnosis = await tool(gpt, "office_submit_result", { ...diagnosisLease, result: stubFromJsonSchema(bundle("BriefDiagnosis")) });
+    check("P1 corrected diagnosis accepted", validDiagnosis.structuredContent.accepted === true);
     await app.end();
   } finally {
     await su.end();

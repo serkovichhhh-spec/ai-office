@@ -4,6 +4,7 @@ import { createHash } from "node:crypto";
 import { bundle } from "@/lib/orchestrator/contracts";
 import { stubFromJsonSchema } from "@/lib/orchestrator/stubgen";
 import { attachCmoSkill } from "@/lib/orchestrator/skills";
+import { OUTPUT_SCHEMAS } from "@/lib/orchestrator/registry";
 
 const ajv = new Ajv2020({ allErrors: true, strict: false });
 ajv.addFormat("uuid", /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i);
@@ -17,6 +18,10 @@ describe("P1 contracts and stubs", () => {
       const schema = bundle(name);
       const validate = ajv.compile(schema);
       expect(validate(stubFromJsonSchema(schema)), JSON.stringify(validate.errors)).toBe(true);
+      for (const key of [name, `${name}.v1`]) {
+        expect(OUTPUT_SCHEMAS[key]?.safeParse({}).success).toBe(false);
+        expect(OUTPUT_SCHEMAS[key]?.safeParse(stubFromJsonSchema(schema)).success).toBe(true);
+      }
     });
   }
   it("honours patterns, length limits and supported formats", () => {

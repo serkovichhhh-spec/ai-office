@@ -2,6 +2,7 @@ import type { z } from "zod";
 import type { AiProvider } from "@/lib/ai/types";
 import type { CatalogEntry } from "./catalog";
 import { LIBRARY_PLAYBOOKS } from "./library";
+import { contract, ROUND2_CONTRACTS } from "./contracts";
 import { oohConcepts } from "./playbooks/ooh-concepts";
 import { reelsConcepts } from "./playbooks/reels-concepts";
 import { ReviewSchema, ScriptsSchema, StrategySchema } from "./schemas";
@@ -43,6 +44,10 @@ export const OUTPUT_SCHEMAS: Record<string, z.ZodType> = {
   review: ReviewSchema,
   review_decision: ReviewDecisionSchema,
   ...Object.fromEntries(ALL.flatMap((p) => Object.entries(p.schemas ?? {}))),
+  ...Object.fromEntries(ROUND2_CONTRACTS.flatMap((name) => {
+    const schema = contract(name);
+    return [[name, schema], [`${name}.v1`, schema]];
+  })),
 };
 
 export function playbookFor(key: string, version = 1): Playbook {
