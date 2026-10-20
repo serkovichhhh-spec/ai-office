@@ -44,7 +44,8 @@ describe("CMO attachment", () => {
     const result = await attachCmoSkill(env, "pavutyna");
     const pack = result.skills![0];
     expect(pack.version).toBe("1.0.0");
-    expect(Object.keys(pack.files)).toHaveLength(6);
+    expect(Object.keys(pack.files)).toEqual(["SKILL.md", "checklist.md", "rubric.json", "examples/good.md", "examples/bad.md"]);
+    expect(pack.files).not.toHaveProperty("evaluation/golden-briefs.json");
     expect(pack.sha256).toBe(createHash("sha256").update(JSON.stringify(Object.entries(pack.files).sort(([a], [b]) => a.localeCompare(b)))).digest("hex"));
     expect(result.context?.file).toBe("context/pavutyna.md");
     expect(result.context?.version).toMatch(/^[a-f0-9]{64}$/);
@@ -57,5 +58,8 @@ describe("CMO attachment", () => {
     expect(await attachCmoSkill(env, "other")).toBe(env);
     const publicEnv = { ...env, data_class: "public" };
     expect(await attachCmoSkill(publicEnv, "pavutyna")).toBe(publicEnv);
+  });
+  it("preserves the envelope data class in context", async () => {
+    expect((await attachCmoSkill({ ...env, data_class: "confidential" }, "pavutyna")).context?.data_class).toBe("confidential");
   });
 });

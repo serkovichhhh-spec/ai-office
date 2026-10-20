@@ -1,4 +1,4 @@
-/** Cross-platform local-only runner. All migrations/drafts run in a disposable database. */
+/** Cross-platform local-only runner. All migrations run in a disposable database. */
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import postgres from "postgres";
@@ -21,7 +21,6 @@ try {
   const files = ["tests/sql/00_supabase_shim.sql",
     ...readdirSync(join(root, "supabase/migrations")).filter((f) => f.endsWith(".sql")).sort().map((f) => `supabase/migrations/${f}`),
     ...readdirSync(join(root, "tests/sql")).filter((f) => /^[1-4]\d_.*\.sql$/.test(f)).sort().map((f) => `tests/sql/${f}`),
-    "supabase/drafts/0009_office_research_concepts.sql",
     ...readdirSync(join(root, "tests/sql")).filter((f) => /^50_.*\.sql$/.test(f)).sort().map((f) => `tests/sql/${f}`)];
   for (const file of files) {
     // Only presentation directives used by the existing psql tests are stripped.

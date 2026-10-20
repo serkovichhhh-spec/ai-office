@@ -42,7 +42,7 @@ begin;
 select set_config('request.jwt.claims','{"sub":"33333333-3333-4333-8333-333333333333"}',true);
 set local role authenticated;
 select t.ok('viewer can read candidates',(select count(*)=1 from office.knowledge_candidates));
-with changed as (update office.knowledge_candidates set status='approved' returning id) select t.ok('viewer cannot approve',count(*)=0) from changed;
+select t.throws('viewer cannot approve',$q$select office.review_knowledge_candidate('0000000e-0000-4000-8000-000000000050','approved',current_date+30,'')$q$,'42501');
 with changed as (update office.concepts set concept_status='selected' returning id) select t.ok('viewer cannot select concepts',count(*)=0) from changed;
 commit;
 begin;
@@ -50,14 +50,14 @@ select set_config('request.jwt.claims','{"sub":"22222222-2222-4222-8222-22222222
 set local role authenticated;
 select t.ok('foreign owner cannot read candidates',(select count(*)=0 from office.knowledge_candidates));
 select t.ok('foreign owner cannot read concepts',(select count(*)=0 from office.concepts));
-with changed as (update office.knowledge_candidates set status='approved' returning id) select t.ok('foreign owner cannot approve',count(*)=0) from changed;
+select t.throws('foreign owner cannot approve',$q$select office.review_knowledge_candidate('0000000e-0000-4000-8000-000000000050','approved',current_date+30,'')$q$,'42501');
 commit;
 begin;
 select set_config('request.jwt.claims','{"sub":"11111111-1111-4111-8111-111111111111"}',true);
 set local role authenticated;
 update office.knowledge_candidates set valid_until=current_date-1;
-select t.throws('owner cannot approve expired research',$q$update office.knowledge_candidates set status='approved'$q$,'23514');
-update office.knowledge_candidates set valid_until=current_date+30,status='approved';
+select t.throws('owner cannot approve expired research',$q$select office.review_knowledge_candidate('0000000e-0000-4000-8000-000000000050','approved',current_date-1,'')$q$,'23514');
+select office.review_knowledge_candidate('0000000e-0000-4000-8000-000000000050','approved',current_date+30,'Перевірено першоджерело');
 select t.ok('owner approval atomically publishes and records reviewer',(select c.reviewed_by=auth.uid() and c.reviewed_at is not null and k.status='approved' and k.valid_until=current_date+30 and k.data_class=c.data_class
  from office.knowledge_candidates c join office.knowledge_docs k on k.id=c.approved_doc_id));
 select t.throws('approved candidate is immutable',$q$update office.knowledge_candidates set claim='A rewritten statement.'$q$,'42501');

@@ -162,6 +162,31 @@ export async function setKnowledgeClassAction(form: FormData): Promise<void> {
   revalidatePath("/w", "layout");
 }
 
+export async function reviewKnowledgeCandidateAction(_prev: ActionState, form: FormData): Promise<ActionState> {
+  const user = await requireUser();
+  const parsed = z.object({
+    id: z.string().uuid(), decision: z.enum(["approved", "rejected"]),
+    review_hash: z.string().regex(/^[a-f0-9]{32}$/),
+    valid_until: z.iso.date().or(z.literal("")).default(""), note: z.string().trim().max(2000).default(""),
+  }).safeParse(Object.fromEntries(form));
+  if (!parsed.success) return { error: "Перевірте дату та рішення" };
+  const v = parsed.data;
+  if (v.decision === "approved" && !v.valid_until) return { error: "Вкажіть, до якої дати актуальне знання" };
+  if (v.decision === "rejected" && !v.note) return { error: "Вкажіть причину відхилення" };
+  try {
+    await asUser(db(), user.id, (tx) => tx`select office.review_knowledge_candidate(${v.id}::uuid,${v.decision},${v.valid_until || null}::date,${v.note},${v.review_hash})`);
+  } catch (e) {
+    const code = (e as { code?: string }).code;
+    if (code === "42501") return { error: "Рішення щодо знань може прийняти лише власник" };
+    if (code === "55000") return { error: "Запис змінився або вже розглянутий — оновіть сторінку перед рішенням" };
+    if (code === "23514") return { error: "Для схвалення потрібні підтверджені джерела та актуальний строк дії" };
+    if (code === "42883") return { error: "Перевірка досліджень ще не ввімкнена" };
+    return { error: "Не вдалося зберегти рішення. Спробуйте ще раз." };
+  }
+  revalidatePath("/w", "layout");
+  return { ok: true };
+}
+
 export async function signInAction(_prev: ActionState, form: FormData): Promise<ActionState> {
   const email = String(form.get("email") ?? "").trim().toLowerCase();
   const password = String(form.get("password") ?? "");

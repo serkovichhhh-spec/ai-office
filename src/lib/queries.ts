@@ -251,12 +251,36 @@ export async function runDetail(userId: string, runId: string): Promise<RunDetai
 export interface KnowledgeDoc {
   id: string; kind: string; title: string; body: string; status: string; source_url: string | null; updated_at: string;
   data_class: string;
+  valid_until: string | null;
+  expired: boolean;
 }
 
 export async function listKnowledge(userId: string, wsId: string): Promise<KnowledgeDoc[]> {
   return asUser(db(), userId, (tx) => tx<KnowledgeDoc[]>`
-    select id, kind, title, body, status, source_url, updated_at, data_class from office.knowledge_docs
+    select id, kind, title, body, status, source_url, updated_at, data_class,
+      to_jsonb(k)->>'valid_until' as valid_until,
+      coalesce((to_jsonb(k)->>'valid_until')::date < (now() at time zone 'Europe/Kyiv')::date,false) as expired from office.knowledge_docs k
     where workspace_id = ${wsId} and status <> 'archived' order by status, kind, title`);
+}
+
+export interface KnowledgeCandidateRow {
+  id: string; title: string; claim: string; confidence: string; why_it_matters: string; owner_question: string | null;
+  sources: Array<{ url: string; title: string; accessed_at: string; quote?: string }>;
+  status: string; data_class: string; valid_until: string | null; review_note: string; created_at: string;
+  research_artifact_id: string; run_id: string; approved_doc_id: string | null; review_hash: string;
+}
+
+/** Keeps the deployed 0008 UI working while 0009 is awaiting a separate rollout. */
+export async function listKnowledgeCandidates(userId: string, wsId: string): Promise<{ enabled: boolean; rows: KnowledgeCandidateRow[] }> {
+  return asUser(db(), userId, async (tx) => {
+    const [{ enabled }] = await tx`select to_regprocedure('office.review_knowledge_candidate(uuid,text,date,text,text)') is not null as enabled`;
+    if (!enabled) return { enabled: false, rows: [] };
+    const rows = await tx<KnowledgeCandidateRow[]>`select c.id,c.title,c.claim,c.confidence,c.why_it_matters,c.owner_question,c.sources,c.status,c.data_class,
+      c.valid_until::text,c.review_note,c.created_at::text,c.research_artifact_id,a.run_id,c.approved_doc_id,md5(to_jsonb(c)::text) as review_hash
+      from office.knowledge_candidates c join office.artifacts a on a.id=c.research_artifact_id
+      where c.workspace_id=${wsId} order by (c.status='candidate') desc,c.created_at desc limit 100`;
+    return { enabled: true, rows };
+  });
 }
 
 export interface ExecutorRow {
