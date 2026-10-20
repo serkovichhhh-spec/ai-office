@@ -204,7 +204,7 @@ select office.gateway_get(t.h('tok_a'), '0000000c-0000-4000-8000-000000000042');
 select office.gateway_get(t.h('tok_a'), '0000000c-0000-4000-8000-000000000042');
 reset role;
 select t.ok('repeated get of the same envelope within 10 minutes is deduplicated',
-  (select count(*) = 1 from office.external_transfers where step_id = '0000000c-0000-4000-8000-000000000042'));
+  (select count(*) = 1 from office.external_transfers where step_id = '0000000c-0000-4000-8000-000000000042' and op = 'get'));
 
 begin;
 select set_config('request.jwt.claims', '{"sub":"44444444-4444-4444-8444-444444444444"}', true);

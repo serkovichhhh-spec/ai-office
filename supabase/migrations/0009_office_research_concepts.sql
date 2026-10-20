@@ -2,6 +2,21 @@
 -- No removals/renames. Existing function signatures and P0 governance are preserved;
 -- worker_context/gateway policy/submit additionally enforce knowledge expiry.
 
+-- Deduplicate repeated reads/claims independently: GET must not hide a later CLAIM.
+create or replace function office.record_transfer(e office.executors, s office.steps, p_op text, p_envelope jsonb) returns void
+language plpgsql security definer set search_path = '' as $$
+declare v_hash text := encode(sha256(convert_to(p_envelope::text, 'UTF8')), 'hex'); g jsonb := coalesce(s.agent_request->'governance', '{}'::jsonb);
+begin
+  if exists (select 1 from office.external_transfers t where t.step_id = s.id and t.executor_id = e.id
+             and t.envelope_sha256 = v_hash and t.op = p_op and t.at > now() - interval '10 minutes') then
+    return;
+  end if;
+  insert into office.external_transfers (workspace_id, run_id, step_id, executor_id, provider, op, data_class,
+                                         envelope_sha256, knowledge_refs, excluded_count)
+  values (s.workspace_id, s.run_id, s.id, e.id, e.provider, p_op, coalesce(g->>'data_class', 'internal'), v_hash,
+          coalesce(g->'knowledge_refs', '[]'::jsonb), coalesce((g->>'excluded_count')::int, 0));
+end $$;
+
 alter table office.knowledge_docs add column valid_until date;
 grant update (valid_until) on office.knowledge_docs to authenticated;
 
