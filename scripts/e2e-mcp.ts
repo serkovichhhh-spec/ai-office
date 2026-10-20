@@ -200,6 +200,9 @@ async function main() {
       && fetched.context.text.includes('"record_id"') && !fetched.context.text.includes(unreferenced.id));
     const taken = (await tool(gpt, "office_claim_task", { task_id: diagnosis })).structuredContent;
     check("P1 diagnosis CLAIM carries the same pack hash", taken.claimed === true && taken.envelope.skills?.[0]?.sha256 === fetched.skills?.[0]?.sha256);
+    check("CMO sends five runtime files, no evaluation answers", Object.keys(taken.envelope.skills[0].files).length === 5
+      && !Object.keys(taken.envelope.skills[0].files).some(k => k.startsWith("evaluation/"))
+      && taken.envelope.context.data_class === taken.envelope.data_class);
     const denied = await tool(other, "office_get_task", { task_id: diagnosis });
     check("P1 foreign workspace receives no pack or context", denied.isError === true && !denied.structuredContent.skills && !denied.structuredContent.context);
     const diagnosisLease = { task_id: diagnosis, attempt_id: taken.attempt_id, lease_token: taken.lease_token };
@@ -209,6 +212,26 @@ async function main() {
     check("P1 invalid diagnosis keeps its lease", stillClaimed.structuredContent.renewed === true);
     const validDiagnosis = await tool(gpt, "office_submit_result", { ...diagnosisLease, result: stubFromJsonSchema(bundle("BriefDiagnosis")) });
     check("P1 corrected diagnosis accepted", validDiagnosis.structuredContent.accepted === true);
+    if (process.env.E2E_DRAFT_0009 === "1") {
+      await su`update office.knowledge_docs set valid_until=current_date-1 where id=${liveKnowledge.id}`;
+      const locking = postgres(dbUrl, { max: 1, onnotice: () => {} });
+      try {
+        await locking.begin(async (tx) => {
+          // Simulate gateway_submit holding its attempt lock before it locks the step.
+          await tx`select id from office.execution_attempts where id=${taken.attempt_id} for update`;
+          await app.begin(async (workerTx) => {
+            await workerTx`select set_config('statement_timeout','2000',true)`;
+            await workerTx`select office.worker_reap()`;
+          });
+          const [row] = await su`select agent_response is not null as unchanged from office.steps where id=${diagnosis}`;
+          check("expiry recovery skips a concurrently locked attempt without blocking", row.unchanged === true);
+        });
+        await app`select office.worker_reap()`;
+        const [recovered] = await su`select status,agent_request,agent_response from office.steps where id=${diagnosis}`;
+        check("next tick recovers the ready step and discards the stale submitted answer", recovered.status === "ready"
+          && recovered.agent_request === null && recovered.agent_response === null);
+      } finally { await locking.end(); }
+    }
     await app.end();
   } finally {
     await su.end();

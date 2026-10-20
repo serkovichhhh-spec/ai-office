@@ -273,16 +273,27 @@ end $$;
 revoke all on function office.review_knowledge_candidate(uuid,text,date,text,text) from public,anon,service_role,office_app;
 grant execute on function office.review_knowledge_candidate(uuid,text,date,text,text) to authenticated;
 
--- Expiry is enforced even if general provider governance has been disabled.
-create or replace function office.gateway_policy_ok(e office.executors,s office.steps) returns boolean
+create function office.knowledge_refs_expired(s office.steps) returns boolean
 language sql stable security definer set search_path = '' as $$
-  select (not coalesce((office.setting(s.workspace_id,'governance_enforced'))::boolean,true)
-      or e.provider='human' or (office.provider_max_class(e.provider) is not null
-        and office.data_class_rank(coalesce(s.agent_request->'governance'->>'data_class','internal')) <= office.data_class_rank(office.provider_max_class(e.provider))))
-    and not exists(select 1 from jsonb_array_elements(coalesce(s.agent_request->'governance'->'knowledge_refs','[]'::jsonb)) ref
+  select exists(select 1 from jsonb_array_elements(coalesce(s.agent_request->'governance'->'knowledge_refs','[]'::jsonb)) ref
       join office.knowledge_docs k on k.id::text=ref->>'record_id' and k.workspace_id=s.workspace_id
       where k.valid_until < (now() at time zone 'Europe/Kyiv')::date);
 $$;
+-- Expiry takes precedence and remains enforced with general governance disabled.
+create function office.gateway_policy_reason(e office.executors,s office.steps) returns text
+language sql stable security definer set search_path = '' as $$
+  select case when office.knowledge_refs_expired(s) then 'knowledge_expired'
+    when not coalesce((office.setting(s.workspace_id,'governance_enforced'))::boolean,true) or e.provider='human'
+      or (office.provider_max_class(e.provider) is not null
+        and office.data_class_rank(coalesce(s.agent_request->'governance'->>'data_class','internal')) <= office.data_class_rank(office.provider_max_class(e.provider))) then null
+    else 'data_class_above_provider_policy' end;
+$$;
+create or replace function office.gateway_policy_ok(e office.executors,s office.steps) returns boolean
+language sql stable security definer set search_path = '' as $$
+  select office.gateway_policy_reason(e,s) is null;
+$$;
+revoke all on function office.knowledge_refs_expired(office.steps),office.gateway_policy_reason(office.executors,office.steps)
+  from public,anon,authenticated,service_role,office_app;
 
 -- Same P0 provider governance; additionally omit expired knowledge from content AND refs.
 create or replace function office.worker_context(p_step uuid) returns jsonb
@@ -350,13 +361,17 @@ begin
   if not found or a.executor_id <> e.id or a.lease_token_hash <> encode(sha256(convert_to(p_lease_token, 'UTF8')), 'hex') then
     raise exception 'attempt not found' using errcode = 'P0002';
   end if;
+  if a.state='rejected' and a.rejection_reason='knowledge_expired' then
+    update office.execution_attempts set result=p_result,submitted_at=now() where id=a.id;
+    return jsonb_build_object('accepted',false,'reason','knowledge_expired','saved_as_proposal',true);
+  end if;
   if a.state not in ('claimed','expired') then
     return jsonb_build_object('accepted', false, 'reason', 'attempt_' || a.state);
   end if;
   select * into s from office.steps where id = a.step_id for update;
 
   if a.lease_expires_at < now() then v_reason := 'lease_expired';
-  elsif not office.gateway_policy_ok(e,s) then v_reason := 'knowledge_expired_or_disallowed';
+  elsif not office.gateway_policy_ok(e,s) then v_reason := office.gateway_policy_reason(e,s);
   elsif s.status <> 'awaiting_agent' then v_reason := 'task_no_longer_waiting';
   elsif office.run_input_hashes(s.run_id) <> a.input_hashes then v_reason := 'inputs_changed';
   end if;
@@ -378,4 +393,118 @@ begin
     office.activity_for_role(s.agent_role), jsonb_build_object('step', s.step_key, 'attempt_id', a.id, 'executor', e.kind,
       'executor_name', e.name, 'executor_id', e.id, 'executor_label', e.label));
   return jsonb_build_object('accepted', true, 'next', 'AI Office перевірить відповідь за схемою протягом ~1 хв');
+end $$;
+
+-- Distinguish expiry from provider-policy denial without changing MCP tool schemas.
+create or replace function office.gateway_get(p_token_hash text, p_step uuid) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare e office.executors; s office.steps; v_env jsonb;
+begin
+  e := office.gateway_executor(p_token_hash, 'get');
+  select * into s from office.steps where id = p_step;
+  if not found or s.workspace_id <> e.workspace_id then raise exception 'task not found' using errcode = 'P0002'; end if;
+  if not office.gateway_policy_ok(e, s) then
+    perform office.log_event(s.workspace_id, s.run_id, s.id, 'system', null, s.agent_role, 'governance.blocked', 'idle',
+      jsonb_build_object('executor_label', e.label, 'provider', e.provider, 'op', 'get'));
+    return jsonb_build_object('task_id', s.id, 'status', s.status, 'claimable', false, 'reason', office.gateway_policy_reason(e,s));
+  end if;
+  v_env := office.gateway_envelope(s.id);
+  perform office.record_transfer(e, s, 'get', v_env);
+  return v_env || jsonb_build_object('status', s.status,
+    'claimable', office.gateway_eligible(e, s)
+      and not exists (select 1 from office.execution_attempts x where x.step_id = s.id and x.state = 'claimed' and x.lease_expires_at > now()));
+end $$;
+create or replace function office.gateway_claim(p_token_hash text, p_step uuid default null) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare e office.executors; s office.steps; v_token text; v_attempt uuid; v_expires timestamptz; v_env jsonb;
+begin
+  e := office.gateway_executor(p_token_hash, 'claim');
+  perform office.gateway_expire();
+  if p_step is null then
+    select st.* into s from office.steps st join office.runs r on r.id = st.run_id and r.status = 'running'
+    where office.gateway_eligible(e, st) and office.gateway_policy_ok(e, st)
+      and not exists (select 1 from office.execution_attempts x where x.step_id = st.id and x.state = 'claimed')
+    order by st.created_at for update of st skip locked limit 1;
+    if not found then
+      if exists(select 1 from office.steps st join office.runs r on r.id=st.run_id and r.status='running'
+        where office.gateway_eligible(e,st) and office.knowledge_refs_expired(st)) then
+        return jsonb_build_object('claimed',false,'reason','knowledge_expired');
+      end if;
+      return jsonb_build_object('claimed',false,'reason','no_tasks');
+    end if;
+  else
+    select * into s from office.steps where id = p_step for update;
+    if not found or s.workspace_id <> e.workspace_id then raise exception 'task not found' using errcode = 'P0002'; end if;
+    if not office.gateway_independent(e, s) then
+      return jsonb_build_object('claimed', false, 'reason', 'not_independent');
+    end if;
+    if not office.gateway_eligible(e, s) then
+      return jsonb_build_object('claimed', false, 'reason', 'not_assigned_to_you_or_not_waiting');
+    end if;
+    if not office.gateway_policy_ok(e, s) then
+      perform office.log_event(s.workspace_id, s.run_id, s.id, 'system', null, s.agent_role, 'governance.blocked', 'idle',
+        jsonb_build_object('executor_label', e.label, 'provider', e.provider, 'op', 'claim'));
+      return jsonb_build_object('claimed', false, 'reason', office.gateway_policy_reason(e,s));
+    end if;
+    if exists (select 1 from office.execution_attempts x where x.step_id = s.id and x.state = 'claimed') then
+      return jsonb_build_object('claimed', false, 'reason', 'already_claimed');
+    end if;
+  end if;
+
+  v_token := replace(gen_random_uuid()::text || gen_random_uuid()::text, '-', '');
+  v_expires := now() + make_interval(mins => e.lease_minutes);
+  insert into office.execution_attempts (step_id, run_id, workspace_id, executor_id, lease_token_hash, lease_expires_at, input_hashes)
+  values (s.id, s.run_id, s.workspace_id, e.id, encode(sha256(convert_to(v_token, 'UTF8')), 'hex'), v_expires,
+          office.run_input_hashes(s.run_id))
+  returning id into v_attempt;
+  v_env := office.gateway_envelope(s.id);
+  perform office.record_transfer(e, s, 'claim', v_env);
+  perform office.log_event(s.workspace_id, s.run_id, s.id, 'agent', null, s.agent_role, 'attempt.claimed',
+    office.activity_for_role(s.agent_role),
+    jsonb_build_object('step', s.step_key, 'attempt_id', v_attempt, 'executor', e.kind, 'executor_name', e.name,
+                       'executor_id', e.id, 'executor_label', e.label, 'lease_expires_at', v_expires));
+  return jsonb_build_object('claimed', true, 'attempt_id', v_attempt, 'lease_token', v_token, 'lease_expires_at', v_expires,
+                            'envelope', v_env);
+end $$;
+-- Reprepare stale parked work automatically on every worker_claim tick.
+create or replace function office.worker_reap() returns int
+language plpgsql security definer set search_path = '' as $$
+declare s record; n int := 0; locked_attempts uuid[];
+begin
+  for s in select * from office.steps where status = 'running' and locked_until < now() for update skip locked loop
+    n := n + 1;
+    if s.attempt >= s.max_attempts then
+      update office.steps set status = 'failed', error = 'lease expired, attempts exhausted',
+        locked_by = null, locked_until = null, finished_at = now() where id = s.id;
+      update office.runs set status = 'failed', error_code = 'step_dead_lettered',
+        error_message = s.step_key || ': lease expired' where id = s.run_id and status = 'running';
+      perform office.log_event(s.workspace_id, s.run_id, s.id, 'system', null, s.agent_role,
+        'step.dead_lettered', 'blocked', jsonb_build_object('reason', 'lease_expired'));
+    else
+      update office.steps set status = 'ready', locked_by = null, locked_until = null,
+        next_attempt_at = now() + make_interval(secs => least(300, 15 * power(2, s.attempt)::int)) where id = s.id;
+      perform office.log_event(s.workspace_id, s.run_id, s.id, 'system', null, s.agent_role,
+        'step.lease_expired', 'idle', jsonb_build_object('attempt', s.attempt));
+    end if;
+  end loop;
+  -- Skip concurrently held steps/attempts rather than reversing gateway_submit's
+  -- attempt -> step lock order. The next worker tick will recover skipped rows.
+  for s in select st.* from office.steps st join office.runs r on r.id=st.run_id
+      join office.workspaces w on w.id=st.workspace_id
+      where st.status in ('awaiting_agent','ready') and office.knowledge_refs_expired(st)
+        and r.status in ('queued','running') and w.status='active'
+      for update of st skip locked loop
+    locked_attempts := array(select a.id from office.execution_attempts a where a.step_id=s.id
+      and a.state in ('claimed','expired','submitted') order by a.id for update skip locked);
+    if exists(select 1 from office.execution_attempts a where a.step_id=s.id
+        and a.state in ('claimed','expired','submitted') and not (a.id=any(locked_attempts))) then continue; end if;
+    update office.execution_attempts set state='rejected',rejection_reason='knowledge_expired'
+      where id=any(locked_attempts);
+    update office.steps set status='ready',agent_request=null,agent_response=null,
+      locked_by=null,locked_until=null,next_attempt_at=now(),finished_at=null where id=s.id;
+    perform office.log_event(s.workspace_id,s.run_id,s.id,'system',null,s.agent_role,
+      'step.knowledge_expired','planning',jsonb_build_object('reason','knowledge_expired','step',s.step_key,'next','reprepare'));
+    n := n+1;
+  end loop;
+  return n;
 end $$;

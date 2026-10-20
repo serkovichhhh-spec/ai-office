@@ -9,7 +9,7 @@ export interface SkillAttachment {
   files: Record<string, string>;
 }
 
-const FILES = ["SKILL.md", "checklist.md", "rubric.json", "examples/good.md", "examples/bad.md", "evaluation/golden-briefs.json"] as const;
+const FILES = ["SKILL.md", "checklist.md", "rubric.json", "examples/good.md", "examples/bad.md"] as const;
 const digest = (value: string) => createHash("sha256").update(value, "utf8").digest("hex");
 
 export function needsCmoSkill(envelope: Record<string, unknown>): boolean {
@@ -31,5 +31,5 @@ export async function attachCmoSkill<T extends Record<string, unknown>>(envelope
   const result = { ...envelope, skills: [{ key: "cmo", version: "1.0.0", sha256, files }] };
   const file = "context/pavutyna.md";
   const text = liveContext ?? await read(file);
-  return { ...result, context: { file, version: digest(text), text, data_class: "internal" } };
+  return { ...result, context: { file, version: digest(text), text, data_class: String(envelope.data_class) } };
 }

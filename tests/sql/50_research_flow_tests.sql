@@ -61,11 +61,55 @@ select t.ok('fresh knowledge can be leased',(select v::jsonb->>'claimed'='true' 
 update office.knowledge_docs set valid_until=current_date-1 where title='Staged factual claim';
 set role office_app;
 select t.ok('GET withholds context for a leased task after expiry',
- (select r->>'claimable'='false' and not (r ? 'instructions') from (select office.gateway_get(t.h('expiry_token'),'0000000c-0000-4000-8000-000000000052') r) q));
+ (select r->>'claimable'='false' and r->>'reason'='knowledge_expired' and not (r ? 'instructions') from (select office.gateway_get(t.h('expiry_token'),'0000000c-0000-4000-8000-000000000052') r) q));
 select t.ok('expired answer saved as proposal instead of accepted',
- (select office.gateway_submit(t.h('expiry_token'),(v::jsonb->>'attempt_id')::uuid,v::jsonb->>'lease_token','{}')->>'reason'='knowledge_expired_or_disallowed' from t.tok where k='expiry_claim'));
+ (select office.gateway_submit(t.h('expiry_token'),(v::jsonb->>'attempt_id')::uuid,v::jsonb->>'lease_token','{}')->>'reason'='knowledge_expired' from t.tok where k='expiry_claim'));
 reset role;
 select t.ok('expired answer does not make the step runnable',(select status='awaiting_agent' from office.steps where id='0000000c-0000-4000-8000-000000000052'));
+-- Regression: expiry after actual park must recover automatically, including an active lease.
+update office.knowledge_docs set valid_until=current_date+1 where title='Staged factual claim';
+insert into office.steps(id,workspace_id,run_id,step_key,agent_role,status,executor,attempt,locked_by,locked_until,created_at)
+select '0000000c-0000-4000-8000-000000000053',workspace_id,run_id,'expiry_repark','strategist','running','chatgpt',1,'initial-park',now()+interval '10 minutes',now()-interval '10 years'
+ from office.steps where id='0000000c-0000-4000-8000-000000000051';
+set role office_app;
+select t.ok('real worker park succeeds',office.worker_park('0000000c-0000-4000-8000-000000000053','initial-park',1,
+ jsonb_build_object('user','stale prompt','governance',jsonb_build_object('data_class','public','knowledge_refs',jsonb_build_array(jsonb_build_object(
+ 'record_id',(select office.worker_context('0000000c-0000-4000-8000-000000000051')->'step'->'agent_request'->'governance'->'knowledge_refs'->0->>'record_id'))))))->>'accepted'='true');
+insert into t.tok select 'repark_claim',office.gateway_claim(t.h('expiry_token'),'0000000c-0000-4000-8000-000000000053')::text;
+reset role;
+select t.ok('parked task has an active executor lease',(select v::jsonb->>'claimed'='true' from t.tok where k='repark_claim'));
+update office.knowledge_docs set valid_until=current_date-1 where title='Staged factual claim';
+set role office_app;
+select t.ok('CLAIM reports knowledge_expired',office.gateway_claim(t.h('expiry_token'),'0000000c-0000-4000-8000-000000000053')->>'reason'='knowledge_expired');
+select office.worker_reap();
+reset role;
+select t.ok('expired parked task returns to ready without stale context',
+ (select status='ready' and agent_request is null and agent_response is null from office.steps where id='0000000c-0000-4000-8000-000000000053'));
+begin;
+select set_config('request.jwt.claims','{"sub":"11111111-1111-4111-8111-111111111111"}',true);
+set local role authenticated;
+select t.ok('owner sees recovery reason in timeline',exists(select 1 from office.events where step_id='0000000c-0000-4000-8000-000000000053' and kind='step.knowledge_expired' and payload->>'reason'='knowledge_expired'));
+commit;
+set role office_app;
+select t.ok('worker can reclaim recovered step',(select id='0000000c-0000-4000-8000-000000000053' from office.worker_claim('expiry-refresh',1,120)));
+select t.ok('fresh prompt context excludes expired record',not exists(select 1 from jsonb_array_elements(office.worker_context('0000000c-0000-4000-8000-000000000053')->'knowledge') k where k->>'title'='Staged factual claim'));
+select office.worker_park('0000000c-0000-4000-8000-000000000053','expiry-refresh',
+ (office.worker_context('0000000c-0000-4000-8000-000000000053')->'step'->>'attempt')::int,
+ jsonb_build_object('user','fresh prompt','governance',office.worker_context('0000000c-0000-4000-8000-000000000053')->'governance'));
+select t.ok('refreshed task is visible to executor again',office.gateway_get(t.h('expiry_token'),'0000000c-0000-4000-8000-000000000053')->>'claimable'='true');
+insert into t.tok select 'fresh_repark_claim',office.gateway_claim(t.h('expiry_token'),'0000000c-0000-4000-8000-000000000053')::text;
+select t.ok('stale lease cannot submit into refreshed task',
+ (select office.gateway_submit(t.h('expiry_token'),(v::jsonb->>'attempt_id')::uuid,v::jsonb->>'lease_token','{"stale":true}')->>'reason'='knowledge_expired' from t.tok where k='repark_claim'));
+reset role;
+select t.ok('new lease survives stale answer',exists(select 1 from office.execution_attempts a join t.tok t on a.id=(t.v::jsonb->>'attempt_id')::uuid where t.k='fresh_repark_claim' and a.state='claimed'));
+select t.ok('refresh event occurs once',(select count(*)=1 from office.events where step_id='0000000c-0000-4000-8000-000000000053' and kind='step.knowledge_expired'));
+insert into office.steps(id,workspace_id,run_id,step_key,agent_role,status,executor,agent_request)
+select '0000000c-0000-4000-8000-000000000054',workspace_id,run_id,'provider_policy','strategist','awaiting_agent','chatgpt','{"governance":{"data_class":"personal"}}'
+ from office.steps where id='0000000c-0000-4000-8000-000000000051';
+set role office_app;
+select t.ok('GET keeps a separate provider-policy reason',office.gateway_get(t.h('expiry_token'),'0000000c-0000-4000-8000-000000000054')->>'reason'='data_class_above_provider_policy');
+select t.ok('CLAIM keeps a separate provider-policy reason',office.gateway_claim(t.h('expiry_token'),'0000000c-0000-4000-8000-000000000054')->>'reason'='data_class_above_provider_policy');
+reset role;
 -- Legacy payload: usable source becomes reported; unusable source remains assumption.
 insert into office.artifacts(workspace_id,run_id,step_id,kind,title,version,content,content_hash,provider)
 select v,'0000000b-0000-4000-8000-000000000050','0000000c-0000-4000-8000-000000000051','legacy_research','Legacy research',1,

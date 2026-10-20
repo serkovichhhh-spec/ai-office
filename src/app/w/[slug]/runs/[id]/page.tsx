@@ -26,6 +26,7 @@ const EVENT_TEXT: Record<string, (e: RunDetail["events"][number]) => string> = {
   "artifact.created": (e) => `Нова версія: ${kindLabel(String(e.payload.kind))} v${e.payload.version}`,
   "step.retry_scheduled": (e) => `${role(e.agent_role)}: збій, повторна спроба (${String(e.payload.error ?? "")})`,
   "step.lease_expired": (e) => `${role(e.agent_role)}: воркер не відповів, крок повернуто в чергу`,
+  "step.knowledge_expired": (e) => `${role(e.agent_role)}: строк дії знання минув — задача повернута на підготовку без простроченого запису`,
   "step.dead_lettered": (e) => `${role(e.agent_role)}: спроби вичерпано — ${String(e.payload.error ?? e.payload.reason ?? "")}`,
   "run.needs_approval": () => "Пакет чекає на ваше рішення",
   "approval.recorded": (e) => `Рішення: ${DECISION[String(e.payload.decision)] ?? e.payload.decision} (v${e.payload.version})`,
