@@ -26,7 +26,15 @@ try {
     // Only presentation directives used by the existing psql tests are stripped.
     const source = readFileSync(join(root, file), "utf8").replace(/^\\(?:set |o(?: |$)).*$/gm, "");
     if (/^\\/m.test(source)) throw new Error(`Unsupported psql directive in ${file}`);
-    await sql.unsafe(source);
+    try {
+      await sql.unsafe(source);
+    } catch (e) {
+      if (file.startsWith("tests/sql/") && !file.includes("00_")) {
+        const failures = await sql`select name, detail from t.results where not ok order by id`.catch(() => []);
+        if (failures.length) console.error(file, failures);
+      }
+      throw e;
+    }
     if (file.startsWith("tests/sql/") && !file.includes("00_")) {
       const failures = await sql`select name, detail from t.results where not ok order by id`;
       const [counts] = await sql`select count(*) filter (where ok) as passed, count(*) filter (where not ok) as failed from t.results`;

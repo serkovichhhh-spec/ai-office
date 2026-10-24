@@ -1,8 +1,9 @@
 import { randomUUID } from "node:crypto";
 import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/supabase";
-import { DATA_CLASS_LABEL, EXECUTOR_LABEL, executors, qaReport, floorState, listHandoffs, listKnowledge, listRuns, workspaceBySlug } from "@/lib/queries";
-import { revokeExecutorAction, setExecutorSeatsAction } from "../../actions";
+import { DATA_CLASS_LABEL, EXECUTOR_LABEL, executors, qaReport, routingState, floorState, listHandoffs, listKnowledge, listRuns, workspaceBySlug } from "@/lib/queries";
+import { revokeExecutorAction, setExecutorSeatsAction, setExecutorVerifiedAction } from "../../actions";
+import { RoutingPanel } from "./RoutingPanel";
 import { PixelAvatar } from "../../components/PixelAvatar";
 import { LiveRefresh } from "../../components/LiveRefresh";
 import { ACTIVITY, HANDOFF_STATUS, ProviderBadge, StatusPill, StubBadge, usd, when } from "../../components/ui";
@@ -23,7 +24,7 @@ export default async function OfficePage({ params }: { params: Promise<{ slug: s
   const ws = await workspaceBySlug(user.id, slug);
   if (!ws) notFound();
   const [floor, runs, handoffs, execs, knowledge] = await Promise.all([floorState(user.id, ws), listRuns(user.id, ws.id), listHandoffs(user.id, ws.id), executors(user.id, ws.id), listKnowledge(user.id, ws.id)]);
-  const qa = ws.role === "owner" ? await qaReport(user.id, ws.id) : null;
+  const [qa, routing] = ws.role === "owner" ? await Promise.all([qaReport(user.id, ws.id), routingState(user.id, ws.id)]) : [null, null];
   const qaProblems = qa?.checks.filter((c) => c.level === "warn" || c.level === "fail") ?? [];
 
   const active = runs.some((r) => r.status === "queued" || r.status === "running");
@@ -37,7 +38,7 @@ export default async function OfficePage({ params }: { params: Promise<{ slug: s
       {(floor.waitingByExecutor.claude_session ?? 0) > 0 && (
         <p className="notice" style={{ marginBottom: 8 }} role="status">
           {floor.waitingByExecutor.claude_session === 1 ? "1 крок чекає" : `${floor.waitingByExecutor.claude_session} кроки чекають`} на Claude.
-          Запусти в Claude задачу «AI Office: відпрацювати чергу» або напиши в чаті «запусти офіс».
+          {routing?.channels.some((c) => c.adapter === "claude_routine" && c.enabled) ? "Офіс розбудить Claude автоматично." : "Запусти в Claude задачу AI Office вручну або увімкни автозапуск у «Маршрутизація і запуск»."}
         </p>
       )}
       {(floor.waitingByExecutor.chatgpt ?? 0) > 0 && (
@@ -168,6 +169,8 @@ export default async function OfficePage({ params }: { params: Promise<{ slug: s
             </section>
           )}
 
+          {routing && <RoutingPanel ws={ws} state={routing} />}
+
           <section className="panel" aria-labelledby="exec-title">
             <div className="panel-head">
               <h2 id="exec-title">Виконавці</h2>
@@ -180,7 +183,10 @@ export default async function OfficePage({ params }: { params: Promise<{ slug: s
                 {execs.map((e) => (
                   <li key={e.id} className="row" style={{ alignItems: "flex-start" }}>
                     <div className="row-main">
-                      <div className="row-title">{e.label} <span className="pill">{EXECUTOR_LABEL[e.kind] ?? e.kind}</span></div>
+                      <div className="row-title">
+                        {e.label} <span className="pill">{EXECUTOR_LABEL[e.kind] ?? e.kind}</span>{" "}
+                        {e.verified_at && <span className="pill ok" title={e.verified_note ?? undefined}>перевірений</span>}
+                      </div>
                       <div className="row-meta">
                         {e.allowed_seats.length === 0
                           ? "Ролей не видано — задач не бачить"
@@ -208,6 +214,15 @@ export default async function OfficePage({ params }: { params: Promise<{ slug: s
                         </details>
                       )}
                     </div>
+                    {ws.role === "owner" && (
+                      <form action={setExecutorVerifiedAction}>
+                        <input type="hidden" name="executor_id" value={e.id} />
+                        <input type="hidden" name="verified" value={e.verified_at ? "false" : "true"} />
+                        <button className="btn link" title="Лише перевірені виконавці можуть підхоплювати чужі кроки">
+                          {e.verified_at ? "Зняти «перевірений»" : "Позначити перевіреним"}
+                        </button>
+                      </form>
+                    )}
                     {ws.role === "owner" && (
                       <form action={revokeExecutorAction}>
                         <input type="hidden" name="executor_id" value={e.id} />

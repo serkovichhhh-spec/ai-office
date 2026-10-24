@@ -293,6 +293,8 @@ export interface ExecutorRow {
   max_data_class: string | null;
   last_seen_at: string | null;
   created_at: string;
+  verified_at: string | null;
+  verified_note: string | null;
 }
 
 /** Connected executors (ChatGPT, Claude) of a workspace. Token hashes are never readable by users. */
@@ -303,7 +305,7 @@ export async function executors(userId: string, wsId: string): Promise<ExecutorR
                         when p.verified_at is null or p.verified_at < now() - interval '90 days' then 'public'
                         else p.max_data_class end
             from office.provider_policies p where p.provider = e.provider) as max_data_class,
-           e.last_seen_at::text, e.created_at::text
+           e.last_seen_at::text, e.created_at::text, e.verified_at::text, e.verified_note
     from office.executors e
     where e.workspace_id = ${wsId} and e.revoked_at is null order by e.created_at`);
 }
@@ -315,6 +317,42 @@ export interface QaReport { status: "ok" | "info" | "warn" | "fail"; generated_a
 export async function qaReport(userId: string, wsId: string): Promise<QaReport | null> {
   try {
     const [{ r }] = await asUser(db(), userId, (tx) => tx<{ r: QaReport }[]>`select office.qa_report(${wsId}::uuid) as r`);
+    return r;
+  } catch {
+    return null;
+  }
+}
+
+export interface RoutingChannel {
+  id: string;
+  label: string;
+  adapter: "claude_routine" | "chatgpt_agent" | "manual_notify";
+  executor_label: string | null;
+  enabled: boolean;
+  paused: boolean;
+  paused_until: string | null;
+  paused_manual: boolean;
+  paused_reason: string | null;
+  quiet_now: boolean;
+  consecutive_failures: number;
+  today: number;
+  daily_cap: number;
+  env_prefix: string | null;
+  last: { event: string; at: string; session_url: string | null } | null;
+}
+export interface RoutingState {
+  triggers_enabled: boolean;
+  routing_enabled: boolean;
+  providers: { provider: string; limited_until: string | null; reason: string; source: string; set_at: string }[];
+  channels: RoutingChannel[];
+  attention: { step_id: string; run_id: string; step: string; seat: string; executor: string; routed_from: string | null;
+               route_blocked: string | null; brief_title: string; since: string }[];
+}
+
+/** Router + Trigger Gateway state for the owner (office.routing_state). Null for non-owners. */
+export async function routingState(userId: string, wsId: string): Promise<RoutingState | null> {
+  try {
+    const [{ r }] = await asUser(db(), userId, (tx) => tx<{ r: RoutingState }[]>`select office.routing_state(${wsId}::uuid) as r`);
     return r;
   } catch {
     return null;
