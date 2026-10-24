@@ -55,7 +55,9 @@ interface RegEntry {
 }
 
 const BASE_BRIEF = new Set(["title", "objective", "audience", "channel", "deliverable_count", "deadline", "acceptance_criteria", "references"]);
-const STEP_TITLE: Record<string, string> = { prepare: "Підготовка", build: "Основний матеріал" };
+const STEP_TITLE: Record<string, string> = { prepare: "Підготовка", build: "Основний матеріал", diagnosis: "CMO-діагноз", plan: "План робіт" };
+/** Author statuses that stop the playbook and send questions to the owner. */
+const STOP_STATUSES = new Set(["blocked", "needs_owner_input", "needs_research"]);
 export const SECTION_LABEL: Record<string, string> = {
   summary: "Підсумок", items: "Календар", cadence_rationale: "Логіка частоти", production_dependencies: "Що потрібно для продакшну",
   units: "Матеріали", publishing_checklist: "Чекліст публікації", creatives: "Креативи", export_checklist: "Чекліст експорту",
@@ -65,6 +67,10 @@ export const SECTION_LABEL: Record<string, string> = {
   tasks: "Завдання запуску", measurement: "Вимірювання", readiness_checklist: "Чекліст готовності", findings: "Висновки",
   calculations: "Розрахунки", actions: "Дії", data_quality: "Якість даних", rows: "Матриця конкурентів",
   research_candidates: "Нові джерела на перевірку", delivery_checklist: "Чекліст доставки",
+  real_task: "Справжня задача", business_objective: "Бізнес-ціль і KPI", audience_tension: "Напруга аудиторії",
+  what_we_know: "Що знаємо", what_we_dont_know: "Чого не знаємо", recommended_playbooks: "Рекомендовані сценарії",
+  strategy_summary: "Стратегія", workstreams: "Потоки робіт", owner_gates: "Рішення власника", success_criteria: "Критерії успіху",
+  risks: "Ризики", open_questions: "Відкриті питання",
   claims_needing_source: "Потрібно підтвердити", assumptions: "Припущення", blocking_questions: "Блокуючі питання",
   source_uses: "Джерела тверджень", review: "Рев'ю",
 };
@@ -93,6 +99,34 @@ function genericChecks(v: Obj): string[] {
   }
   if (v.status === "blocked" && arr(v.blocking_questions).length === 0) out.push("status=blocked потребує хоча б одного blocking_questions");
   return out;
+}
+
+/** Playbooks a CMO diagnosis or work plan may route to (key@version of every runnable library playbook). */
+function routablePlaybooks(): Set<string> {
+  return new Set(defs.filter((d) => d.playbook_key !== "cmo_brief_diagnosis").map((d) => `${d.playbook_key}@${regByKey.get(d.playbook_key)?.version ?? 1}`));
+}
+
+function intelligenceChecks(stepKey: string): SemanticCheck {
+  return (v) => {
+    const out = genericChecks(v);
+    const known = routablePlaybooks();
+    if (stepKey === "diagnosis") {
+      arr(v.recommended_playbooks).forEach((r, i) => {
+        if (!known.has(String(r.playbook))) out.push(`recommended_playbooks[${i}].playbook «${String(r.playbook)}» немає в офісі; доступні: ${[...known].join(", ")}`);
+      });
+    }
+    if (stepKey === "plan") {
+      const ids = new Set(arr(v.workstreams).map((w) => String(w.id)));
+      arr(v.workstreams).forEach((w, i) => {
+        if (!known.has(String(w.playbook))) out.push(`workstreams[${i}].playbook «${String(w.playbook)}» немає в офісі; доступні: ${[...known].join(", ")}`);
+        for (const d of (w.depends_on as string[] | undefined) ?? []) if (!ids.has(d) || d === w.id) out.push(`workstreams[${i}].depends_on: «${d}» не є іншим потоком цього плану`);
+      });
+      arr(v.owner_gates).forEach((g, i) => {
+        if (g.after !== "plan" && !ids.has(String(g.after))) out.push(`owner_gates[${i}].after «${String(g.after)}» не є потоком плану`);
+      });
+    }
+    return out;
+  };
 }
 
 function buildChecks(key: string, ctx: StepContext): SemanticCheck {
@@ -183,7 +217,8 @@ function libraryPlaybook(def: LibDef): Playbook {
     const missing = (ctx.step.input.missing_inputs as string[] | undefined) ?? [];
     const res = await ai.generate({
       schemaName: name,
-      schema: contract<Obj>(name, s.key === "build" ? buildChecks(def.playbook_key, ctx) : genericChecks),
+      schema: contract<Obj>(name, def.playbook_key === "cmo_brief_diagnosis" ? intelligenceChecks(s.key)
+        : s.key === "build" ? buildChecks(def.playbook_key, ctx) : genericChecks),
       jsonSchema: bundle(name),
       tier: (ctx.agent?.model_tier ?? "balanced") as ModelTier,
       maxOutputTokens: 12000,
@@ -195,8 +230,12 @@ function libraryPlaybook(def: LibDef): Playbook {
         dataBlock("brief", briefText(ctx.brief)),
         ...s.inputs.filter((i) => i.startsWith("artifact:")).flatMap((i) => {
           const a = latestArtifact<unknown>(ctx, i.slice(9));
-          return a ? [dataBlock("artifact", `${i.slice(9)} v${a.version}:\n${JSON.stringify(a.content)}`)] : [];
+          const meta = ctx.artifacts.filter((x) => x.kind === i.slice(9)).sort((x, y) => x.version - y.version).at(-1);
+          return a ? [dataBlock("artifact", `${i.slice(9)} v${a.version}${meta?.id ? ` (artifact_id=${meta.id})` : ""}:\n${JSON.stringify(a.content)}`)] : [];
         }),
+        def.playbook_key === "cmo_brief_diagnosis"
+          ? `Службові значення: brief_id = "${ctx.brief.id}", data_class = "${ctx.governance?.data_class ?? "internal"}". Доступні сценарії офісу: ${[...routablePlaybooks()].join(", ")}.`
+          : "",
         dataBlock("knowledge", knowledgeText(ctx.knowledge)),
         missing.length ? `У брифі не заповнені обов'язкові входи: ${missing.join(", ")}. Якщо без них результат неможливий — status=blocked із точними blocking_questions.` : "",
         prev ? dataBlock("artifact", `Попередня версія (${s.key} v${prev.version}):\n${JSON.stringify(prev.content)}`) : "",
@@ -204,13 +243,15 @@ function libraryPlaybook(def: LibDef): Playbook {
         feedback.length ? "Поверни ПОВНИЙ замінний результат (не патч). Виправ усі critical/major за їхніми ID; не погіршуй того, що не критикували." : "",
         "Посилання на знання: KnowledgeRef {record_id, version, pointer} — record_id і version з заголовка документа в <knowledge>, pointer зазвичай \"/body\".",
         "source_uses.output_pointer — JSON Pointer (RFC 6901) на поле твого результату, яке спирається на знання.",
-        "Факти лише з <knowledge>. Решту — у claims_needing_source: disposition=excluded, якщо прибрано з матеріалу; placeholder означає status=blocked.",
+        def.playbook_key === "cmo_brief_diagnosis"
+          ? "Факти лише з <knowledge> з KnowledgeRef. Невідоме — у what_we_dont_know / open_questions, не вигадуй."
+          : "Факти лише з <knowledge>. Решту — у claims_needing_source: disposition=excluded, якщо прибрано з матеріалу; placeholder означає status=blocked.",
       ].filter(Boolean).join("\n\n"),
       stub: stubFor(name, ctx),
     });
     const out = res.output as Obj;
     let next: StepResult["next_steps"];
-    if (out.status === "blocked") next = toPackage("blocked", s.key);
+    if (STOP_STATUSES.has(String(out.status))) next = toPackage("blocked", s.key);
     else {
       const i = order.indexOf(s.key);
       const nk = order[i + 1];
@@ -227,9 +268,9 @@ function libraryPlaybook(def: LibDef): Playbook {
       artifacts: [{ kind: s.key, title: `${STEP_TITLE[s.key] ?? s.key}: ${def.title}`, content: { ...out, _provider: res.provider } }],
       next_steps: next,
       run_status: null,
-      activity: s.key === "prepare" ? "researching" : "drafting",
-      message: out.status === "blocked"
-        ? `${STEP_TITLE[s.key] ?? s.key}: заблоковано — бракує входів (${arr(out.blocking_questions).length} питань)`
+      activity: s.key === "prepare" || s.key === "diagnosis" ? "researching" : "drafting",
+      message: STOP_STATUSES.has(String(out.status))
+        ? `${STEP_TITLE[s.key] ?? s.key}: заблоковано — бракує входів (${arr(out.blocking_questions).length || arr(out.questions_to_owner).length || arr(out.what_we_dont_know).length} питань)`
         : feedback.length ? `${STEP_TITLE[s.key] ?? s.key}: доопрацьовано за зауваженнями`
           : `${STEP_TITLE[s.key] ?? s.key} готово${count !== null && s.key === "build" ? ` (${count})` : ""}`,
     };
@@ -352,7 +393,13 @@ function libraryPlaybook(def: LibDef): Playbook {
       ...arr(build?.content.claims_needing_source),
       ...(build ? [] : arr(prep?.content.claims_needing_source)),
     ].map((c) => `${String(c.text)}${c.disposition === "excluded" ? " (прибрано з матеріалу)" : ""}`);
-    const blocking = arr((source?.content.blocking_questions as unknown) ?? []).map(String);
+    const blocking = [
+      ...arr((source?.content.blocking_questions as unknown) ?? []).map(String),
+      ...arr(source?.content.questions_to_owner).map((q) => `${String(q.question)} — ${String(q.why_it_matters)}`),
+      ...(source?.content.status === "needs_research"
+        ? arr(source?.content.what_we_dont_know).filter((g) => g.resolve_by !== "assume").map((g) => `Потрібне дослідження: ${String(g.gap)}`)
+        : []),
+    ];
     const providers = new Set(ctx.artifacts.map((a) => (a.content as { _provider?: string })?._provider).filter(Boolean));
     const content = {
       schema_version: "Package.v1",
@@ -424,6 +471,19 @@ function libraryPlaybook(def: LibDef): Playbook {
 }
 
 function fixStub(key: string, v: Obj, ctx: StepContext): Obj {
+  if (key === "cmo_brief_diagnosis") {
+    const target = [...routablePlaybooks()][0];
+    if (Array.isArray(v.recommended_playbooks)) arr(v.recommended_playbooks).forEach((r) => { r.playbook = target; });
+    if (Array.isArray(v.workstreams)) {
+      arr(v.workstreams).forEach((w, i) => { w.id = `ws${i + 1}`; w.playbook = target; w.depends_on = []; });
+      v.workstreams = arr(v.workstreams).slice(0, v.depth === "light" ? 2 : 4);
+      arr(v.owner_gates).forEach((g) => { g.after = "plan"; });
+    }
+    if (v.schema_version === "BriefDiagnosis.v1") {
+      v.status = "ready"; v.questions_to_owner = []; v.sensitive_topics = ["none"];
+      if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(String(ctx.brief.id))) v.brief_id = ctx.brief.id;
+    }
+  }
   if (key === "paid_media_campaign" && v.structure) {
     const budget = arr((v.structure as Obj).budget);
     budget.forEach((b, i) => { b.share_percent = i === 0 ? 100 - (budget.length - 1) : 1; });

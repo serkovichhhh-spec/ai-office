@@ -108,6 +108,15 @@
    "deliverable_count_max": 30,
    "author_executor": "claude_session",
    "review_executor": "chatgpt"
+  },
+  {
+   "playbook_key": "cmo_brief_diagnosis",
+   "priority": "P1",
+   "version": 1,
+   "main_output": "workstreams",
+   "deliverable_count_max": 1,
+   "author_executor": "claude_session",
+   "review_executor": "chatgpt"
   }
  ]
 }

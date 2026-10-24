@@ -21,7 +21,7 @@ try {
   const files = ["tests/sql/00_supabase_shim.sql",
     ...readdirSync(join(root, "supabase/migrations")).filter((f) => f.endsWith(".sql")).sort().map((f) => `supabase/migrations/${f}`),
     ...readdirSync(join(root, "tests/sql")).filter((f) => /^[1-4]\d_.*\.sql$/.test(f)).sort().map((f) => `tests/sql/${f}`),
-    ...readdirSync(join(root, "tests/sql")).filter((f) => /^50_.*\.sql$/.test(f)).sort().map((f) => `tests/sql/${f}`)];
+    ...readdirSync(join(root, "tests/sql")).filter((f) => /^[5-9]\d_.*\.sql$/.test(f)).sort().map((f) => `tests/sql/${f}`)];
   for (const file of files) {
     // Only presentation directives used by the existing psql tests are stripped.
     const source = readFileSync(join(root, file), "utf8").replace(/^\\(?:set |o(?: |$)).*$/gm, "");

@@ -30,7 +30,7 @@ export interface CatalogEntry {
 
 export const FIELD_LABEL: Record<string, string> = {
   period_start: "Початок періоду", period_end: "Кінець періоду", channels: "Канали", pillars: "Рубрики",
-  capacity_knowledge_ids: "Ресурси команди (знання)", events_knowledge_ids: "Події й інфоприводи (знання)",
+  capacity_knowledge_ids: "Ресурси команди (знання)", context_knowledge_ids: "Ключові знання для діагнозу", budget_hint: "Орієнтир бюджету", events_knowledge_ids: "Події й інфоприводи (знання)",
   content_kind: "Вид контенту", plan_item_ids: "Елементи затвердженого плану", available_asset_ids: "Доступні матеріали",
   production_constraints: "Обмеження продакшну", platform_spec_knowledge_ids: "Технічні вимоги платформ (знання)",
   placements: "Місця розміщення", format_knowledge_ids: "Специфікації форматів (знання)", asset_ids: "Доступні матеріали",
@@ -69,4 +69,5 @@ export const PLAYBOOK_GROUP: Record<string, string> = {
   outdoor_print_pack: "Дизайн і креатив", ooh_concepts: "Дизайн і креатив",
   paid_media_campaign: "Реклама й запуски", offer_launch: "Реклама й запуски", owned_media_copy: "Реклама й запуски",
   campaign_analysis: "Аналітика", competitor_analysis: "Аналітика",
+  cmo_brief_diagnosis: "Стратегія",
 };

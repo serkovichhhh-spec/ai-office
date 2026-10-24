@@ -1742,5 +1742,128 @@
    "SMS дорожчає через довжину: delivery check",
    "Непідтверджений час відновлення: виключити або blocked"
   ]
+ },
+ {
+  "playbook_key": "cmo_brief_diagnosis",
+  "title": "CMO-діагноз брифу і план робіт",
+  "use_when": "Коли задача сформульована як «потрібен білборд/рілс/акція», а справжня бізнес-задача, KPI і потрібні сценарії ще не ясні. Результат — діагноз, питання власнику й план робіт із конкретними сценаріями офісу.",
+  "brief_fields": [
+   {
+    "key": "context_knowledge_ids",
+    "type": "list",
+    "required": false,
+    "hint": "0-30 ID знань, на які варто спертися насамперед (решта затверджених знань теж доступна)."
+   },
+   {
+    "key": "budget_hint",
+    "type": "string",
+    "required": false,
+    "hint": "Орієнтир бюджету або «невідомо»."
+   }
+  ],
+  "steps": [
+   {
+    "key": "diagnosis",
+    "seat": "strategist",
+    "executor": "claude_session",
+    "depends_on": [],
+    "inputs": [
+     "brief",
+     "knowledge"
+    ],
+    "task": "Ти — CMO ПАВУТИНИ. Діагностуй бриф за CMO Skill Pack (якщо Office передав skills/context — дотримуйся їх). Відокрем симптом від причини, сформулюй справжню задачу, бізнес-ціль і 1–3 вимірювані KPI з тим, як їх виміряти. Що знаємо — лише з <knowledge> з KnowledgeRef. Чого не знаємо — з впливом і тим, хто закриває прогалину. Питання власнику — не більше 3, лише ті, що змінюють план; відповіді, які є в знаннях, не питай. Порекомендуй 1–3 сценарії офісу у форматі key@version зі списку доступних. Війна, політика, трагедії → status=needs_owner_input.",
+    "output_schema": {
+     "$ref": "schemas.json#/$defs/BriefDiagnosis"
+    },
+    "quality_checks": [
+     "Справжня задача відділена від формату",
+     "Кожен факт має KnowledgeRef",
+     "Питання власнику змінюють план і їх ≤ 3",
+     "Рекомендовані сценарії існують в офісі"
+    ]
+   },
+   {
+    "key": "plan",
+    "seat": "strategist",
+    "executor": "claude_session",
+    "depends_on": [
+     "diagnosis"
+    ],
+    "inputs": [
+     "brief",
+     "knowledge",
+     "artifact:diagnosis"
+    ],
+    "task": "Склади WorkPlan за діагнозом: мінімальна кількість потоків робіт (light ≤ 2, standard ≤ 4), кожен — існуючий сценарій офісу key@version з полями брифу, залежностями й класом вартості. Додай точки рішення власника, критерії успіху й ризики. Не додавай роботи «про запас».",
+    "output_schema": {
+     "$ref": "schemas.json#/$defs/WorkPlan"
+    },
+    "quality_checks": [
+     "Потоки відповідають діагнозу",
+     "Сценарії існують в офісі",
+     "Оцінка часу власника реалістична"
+    ]
+   }
+  ],
+  "review": {
+   "seat": "reviewer",
+   "executor": "chatgpt",
+   "criteria": [
+    {
+     "key": "evidence",
+     "what": "Кожне твердження «що знаємо» має чинний KnowledgeRef; цифр без джерела немає.",
+     "pass_if": "score == 5"
+    },
+    {
+     "key": "brief_fit",
+     "what": "Справжня задача, бізнес-ціль і KPI випливають із брифу та знань, а не переказують формат.",
+     "pass_if": "score >= 4"
+    },
+    {
+     "key": "brand",
+     "what": "Позиціонування й тон відповідають брендбуку; чутливі теми (війна, названі конкуренти, ціни) позначені та винесені на рішення власника.",
+     "pass_if": "score >= 4"
+    },
+    {
+     "key": "specialist",
+     "what": "План мінімальний, послідовний і виконуваний сценаріями офісу; питання власнику справді змінюють план.",
+     "pass_if": "score >= 4"
+    },
+    {
+     "key": "execution",
+     "what": "Можна запустити перший потік без вигаданих даних; точки рішення власника чіткі.",
+     "pass_if": "score >= 4"
+    }
+   ],
+   "send_back_to": "plan"
+  },
+  "package": {
+   "sections": [
+    "real_task",
+    "business_objective",
+    "audience_tension",
+    "what_we_know",
+    "what_we_dont_know",
+    "recommended_playbooks",
+    "strategy_summary",
+    "workstreams",
+    "owner_gates",
+    "success_criteria",
+    "risks",
+    "open_questions",
+    "blocking_questions"
+   ]
+  },
+  "handoff": {
+   "to": "human",
+   "payload": [
+    "workstreams",
+    "owner_gates"
+   ]
+  },
+  "risks": [
+   "Діагноз без підтвердженої автономності чи цін — лише з питаннями власнику",
+   "План може рекомендувати сценарії, які ще не протестовані в проді"
+  ]
  }
 ]

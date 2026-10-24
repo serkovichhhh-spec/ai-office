@@ -98,6 +98,11 @@ async function main() {
     check("approval creates handoff", Boolean((decision[0].d as { handoff_id?: string }).handoff_id));
     const [h] = await su`select status, payload->>'schema_version' as v from office.handoffs where run_id = ${runId}`;
     check("handoff queued with v1 contract", h?.status === "queued" && h?.v === "handoff.v1", h);
+    const cmo = await su`select e->>'stream' as stream, e->>'url' as url from cmo.space_documents d, jsonb_array_elements(d.payload) e
+                         where d.key = 'execution' and e->>'id' like 'aio-%'`;
+    check("approved package appears in CMO Space «Виконання» with a link back (0010)", cmo.length === 1 && String(cmo[0].url).includes(String(runId)), cmo);
+    const qa = await su`select office.qa_run('pavutyna') as r`;
+    check("QA report runs after a full flow (0010)", ["ok", "info", "warn", "fail"].includes(String((qa[0].r as { status?: string }).status)), qa[0].r);
     const [final] = await su`select status from office.runs where id = ${runId}`;
     check("run status handoff_queued", final.status === "handoff_queued", final);
 
