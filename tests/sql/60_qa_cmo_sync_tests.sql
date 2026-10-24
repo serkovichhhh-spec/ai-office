@@ -77,6 +77,19 @@ select t.ok('worker backlog detected',
   (select (x->>'count')::int >= 1 and x->>'level' = 'fail' from jsonb_array_elements(office.qa_checks((select v from t.ids where k = 'ws_a'))->'checks') x
    where x->>'key' = 'worker_backlog'));
 
+-- An attempt older than the transfer audit (pre-0008) is not counted as an audit gap.
+insert into office.execution_attempts (step_id, run_id, workspace_id, executor_id, lease_token_hash, lease_expires_at, claimed_at, state)
+select s.id, s.run_id, s.workspace_id, (select id from office.executors where workspace_id = s.workspace_id limit 1),
+       repeat('a', 64), now() - interval '2 days', now() - interval '2 days', 'expired'
+from office.steps s where s.workspace_id = (select v from t.ids where k = 'ws_a') limit 1;
+update office.settings set updated_at = now() - interval '1 day' where workspace_id is null and key = 'governance_enforced';
+select t.ok('pre-audit attempts are not audit gaps',
+  (select (x->>'count')::int = (select count(*) from office.execution_attempts xa
+            where xa.workspace_id = (select v from t.ids where k = 'ws_a') and xa.claimed_at > now() - interval '1 day'
+              and not exists (select 1 from office.external_transfers t2 where t2.step_id = xa.step_id and t2.executor_id = xa.executor_id
+                              and t2.op = 'claim' and t2.at between xa.claimed_at - interval '1 minute' and xa.claimed_at + interval '1 minute'))
+   from jsonb_array_elements(office.qa_checks((select v from t.ids where k = 'ws_a'))->'checks') x where x->>'key' = 'transfer_audit_gap'));
+
 select t.throws('unknown workspace', $q$select office.qa_run('nope')$q$, 'P0002');
 
 begin;
