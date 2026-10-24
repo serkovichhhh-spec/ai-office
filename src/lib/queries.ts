@@ -307,3 +307,16 @@ export async function executors(userId: string, wsId: string): Promise<ExecutorR
     from office.executors e
     where e.workspace_id = ${wsId} and e.revoked_at is null order by e.created_at`);
 }
+
+export interface QaCheck { key: string; level: "ok" | "info" | "warn" | "fail"; count: number; detail: string }
+export interface QaReport { status: "ok" | "info" | "warn" | "fail"; generated_at: string; checks: QaCheck[] }
+
+/** System health for the owner (office.qa_report). Null for non-owners or if the report is unavailable. */
+export async function qaReport(userId: string, wsId: string): Promise<QaReport | null> {
+  try {
+    const [{ r }] = await asUser(db(), userId, (tx) => tx<{ r: QaReport }[]>`select office.qa_report(${wsId}::uuid) as r`);
+    return r;
+  } catch {
+    return null;
+  }
+}

@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/supabase";
-import { DATA_CLASS_LABEL, EXECUTOR_LABEL, executors, floorState, listHandoffs, listKnowledge, listRuns, workspaceBySlug } from "@/lib/queries";
+import { DATA_CLASS_LABEL, EXECUTOR_LABEL, executors, qaReport, floorState, listHandoffs, listKnowledge, listRuns, workspaceBySlug } from "@/lib/queries";
 import { revokeExecutorAction, setExecutorSeatsAction } from "../../actions";
 import { PixelAvatar } from "../../components/PixelAvatar";
 import { LiveRefresh } from "../../components/LiveRefresh";
@@ -23,6 +23,8 @@ export default async function OfficePage({ params }: { params: Promise<{ slug: s
   const ws = await workspaceBySlug(user.id, slug);
   if (!ws) notFound();
   const [floor, runs, handoffs, execs, knowledge] = await Promise.all([floorState(user.id, ws), listRuns(user.id, ws.id), listHandoffs(user.id, ws.id), executors(user.id, ws.id), listKnowledge(user.id, ws.id)]);
+  const qa = ws.role === "owner" ? await qaReport(user.id, ws.id) : null;
+  const qaProblems = qa?.checks.filter((c) => c.level === "warn" || c.level === "fail") ?? [];
 
   const active = runs.some((r) => r.status === "queued" || r.status === "running");
   const waiting = runs.filter((r) => r.status === "needs_approval");
@@ -141,6 +143,30 @@ export default async function OfficePage({ params }: { params: Promise<{ slug: s
               </ul>
             )}
           </section>
+
+          {qa && (
+            <section className="panel" aria-labelledby="qa-title">
+              <div className="panel-head">
+                <h2 id="qa-title">Стан системи</h2>
+                <span className={`pill ${qa.status === "fail" ? "bad" : qa.status === "warn" ? "wait" : "ok"}`}>
+                  {qa.status === "fail" ? "є збої" : qa.status === "warn" ? "потребує уваги" : "усе працює"}
+                </span>
+              </div>
+              {qaProblems.length === 0 ? (
+                <p className="empty">Перевірок: {qa.checks.length}. Проблем не знайдено.</p>
+              ) : (
+                <ul className="list">
+                  {qaProblems.map((c) => (
+                    <li key={c.key} className="row">
+                      <div className="row-main">
+                        <div className="row-title">{c.detail} <span className={`pill ${c.level === "fail" ? "bad" : "wait"}`}>{c.count}</span></div>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+          )}
 
           <section className="panel" aria-labelledby="exec-title">
             <div className="panel-head">

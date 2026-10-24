@@ -31,6 +31,8 @@ const EVENT_TEXT: Record<string, (e: RunDetail["events"][number]) => string> = {
   "run.needs_approval": () => "Пакет чекає на ваше рішення",
   "approval.recorded": (e) => `Рішення: ${DECISION[String(e.payload.decision)] ?? e.payload.decision} (v${e.payload.version})`,
   "handoff.queued": () => "Передано в чергу продакшну",
+  "cmo_sync.done": () => "Задачу створено в CMO Space («Виконання»)",
+  "cmo_sync.failed": (e) => `Не вдалося передати в CMO Space: ${String(e.payload.error ?? "")} — QA-агент повідомить`,
   "run.cancelled": () => "Запуск скасовано",
   "run.budget_exceeded": () => "Зупинено: вичерпано бюджет",
   "run.max_steps": () => "Зупинено: забагато кроків",
@@ -39,7 +41,7 @@ const EVENT_TEXT: Record<string, (e: RunDetail["events"][number]) => string> = {
   "attempt.saved_as_proposal": (e) => `${role(e.agent_role)}: результат від ${who(e.payload.executor)} збережено як пропозицію, не застосовано (${PROPOSAL[String(e.payload.reason)] ?? e.payload.reason})`,
   "step.agent_submitted": (e) => `${role(e.agent_role)}: ${String(e.payload.executor_label ?? e.payload.executor_name ?? who(e.payload.executor))} передав результат — ${stepLabel(String(e.payload.step))}`,
 };
-const PROPOSAL: Record<string, string> = { lease_expired: "оренда минула", task_no_longer_waiting: "задача вже неактуальна", inputs_changed: "вхідні дані змінилися" };
+const PROPOSAL: Record<string, string> = { lease_expired: "оренда минула", task_no_longer_waiting: "задача вже неактуальна", inputs_changed: "вхідні дані змінилися", knowledge_expired: "знання прострочене", data_class_above_provider_policy: "рівень даних вищий за дозволений виконавцю" };
 const who = (k: unknown) => EXECUTOR_LABEL[String(k ?? "claude_session")] ?? String(k);
 const DECISION: Record<string, string> = { approved: "затверджено", rejected: "відхилено", revision_requested: "на доопрацювання" };
 const KIND: Record<string, string> = { strategy: "стратегія", scripts: "сценарії", review: "рев'ю", deliverable: "пакет" };
@@ -47,7 +49,7 @@ const role = (r: string | null) => (r ? ROLE_LABEL[r] ?? r : "Система");
 const kindLabel = (k: string) => KIND[k] ?? k;
 
 function dotTone(kind: string) {
-  if (kind.includes("dead") || kind.includes("budget") || kind === "run.cancelled") return "bad";
+  if (kind.includes("dead") || kind.includes("budget") || kind.includes("failed") || kind === "run.cancelled") return "bad";
   if (kind === "step.started") return "active";
   if (kind.includes("succeeded") || kind.includes("artifact") || kind.includes("handoff") || kind.includes("approval")) return "ok";
   return "";

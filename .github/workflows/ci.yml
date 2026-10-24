@@ -1,0 +1,44 @@
+name: CI
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      E2E_ADMIN_URL: postgres://postgres:postgres@localhost:5432/postgres
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Typecheck
+        run: npx tsc --noEmit
+      - name: Unit tests
+        run: npm test
+      - name: Contract examples
+        run: node docs/review-round2/contracts/validate.mjs .
+      - name: SQL acceptance tests (all migrations on a throwaway database)
+        run: npm run test:sql
+      - name: End-to-end through the MCP handler
+        run: npm run test:e2e-mcp
+      - name: End-to-end local worker
+        run: npm run test:e2e-local
+      - name: Production build
+        run: npx next build
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ci-placeholder
+          DATABASE_URL: postgres://ci:ci@localhost:5432/ci

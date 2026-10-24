@@ -60,14 +60,14 @@ class Reviewer implements AiProvider {
 }
 
 describe("playbook library v1", () => {
-  it("registers 12 playbooks; catalogue offers library reels v2 and outdoor_print_pack, not the old ones", () => {
-    expect(LIBRARY_PLAYBOOKS).toHaveLength(12);
+  it("registers 13 playbooks; catalogue offers library reels v2 and outdoor_print_pack, not the old ones", () => {
+    expect(LIBRARY_PLAYBOOKS).toHaveLength(13);
     const keys = PLAYBOOK_CATALOG.map((p) => `${p.key}@${p.version}`);
     expect(keys).toContain("reels_concepts@2");
     expect(keys).not.toContain("reels_concepts@1");
     expect(keys).not.toContain("ooh_concepts@1");
     expect(PLAYBOOK_CATALOG.filter((p) => p.priority === "P1").map((p) => p.key).sort()).toEqual(
-      ["graphic_design_pack", "offer_launch", "outdoor_print_pack", "paid_media_campaign", "reels_concepts"]);
+      ["cmo_brief_diagnosis", "graphic_design_pack", "offer_launch", "outdoor_print_pack", "paid_media_campaign", "reels_concepts"]);
     expect(() => playbookFor("reels_concepts", 1)).not.toThrow(); // old runs keep working
   });
 
@@ -75,7 +75,8 @@ describe("playbook library v1", () => {
     it(`${pb.key}: stub run goes intake → prepare → build → review → package (ready)`, async () => {
       const fields = pb.key === "reels_concepts" ? { duration_seconds: 15 } : {};
       const { trail, last, artifacts } = await drive(pb.key, pb.version, new StubProvider(), { fields });
-      expect(trail).toEqual(["intake", "prepare", "build", "review", "package"]);
+      const authors = pb.key === "cmo_brief_diagnosis" ? ["diagnosis", "plan"] : ["prepare", "build"];
+      expect(trail).toEqual(["intake", ...authors, "review", "package"]);
       expect(last.run_status).toBe("needs_approval");
       const pkg = artifacts.find((a) => a.kind === "deliverable")!.content as { outcome: string; sections: unknown[] };
       expect(pkg.outcome).toBe("ready_for_approval");
@@ -88,7 +89,7 @@ describe("playbook library v1", () => {
       const fields = pb.key === "reels_concepts" ? { duration_seconds: 15 } : {};
       const { executors } = await drive(pb.key, pb.version, new StubProvider(), { fields });
       expect(executors.review, pb.key).toBeDefined();
-      expect(executors.review, pb.key).not.toBe(executors.build);
+      expect(executors.review, pb.key).not.toBe(pb.key === "cmo_brief_diagnosis" ? executors.plan : executors.build);
     }
   });
 
@@ -104,6 +105,44 @@ describe("playbook library v1", () => {
     const { trail, artifacts } = await drive("paid_media_campaign", 1, new Reviewer(["escalate"]));
     expect(trail).toEqual(["intake", "prepare", "build", "review", "package"]);
     expect((artifacts.find((a) => a.kind === "deliverable")!.content as { outcome: string }).outcome).toBe("escalated");
+  });
+
+  it("CMO diagnosis: needs_owner_input stops before the plan and sends ≤3 owner questions", async () => {
+    const asking: AiProvider = {
+      name: "stub",
+      async generate<T>(req: GenerateRequest<T>) {
+        if (req.schemaName === "BriefDiagnosis") {
+          const base = (await new StubProvider().generate(req)).output as Record<string, unknown>;
+          const out = { ...base, status: "needs_owner_input", questions_to_owner: [
+            { id: "Q1", question: "Яка підтверджена автономність мережі на Позняках?", why_it_matters: "Від цього залежить головне повідомлення білборда." }] };
+          return { output: req.schema.parse(out), usage: { tokens_in: 0, tokens_out: 0, cost_usd: 0 }, model: "stub", provider: "stub" as const };
+        }
+        return new StubProvider().generate(req);
+      },
+    };
+    const { trail, artifacts, prompts } = await drive("cmo_brief_diagnosis", 1, asking);
+    expect(trail).toEqual(["intake", "diagnosis", "package"]);
+    const pkg = artifacts.find((a) => a.kind === "deliverable")!.content as { outcome: string; blocking_questions: string[] };
+    expect(pkg.outcome).toBe("blocked");
+    expect(pkg.blocking_questions[0]).toContain("автономність");
+    expect(prompts.BriefDiagnosis).toContain("brief_id");
+    expect(prompts.BriefDiagnosis).toContain("owned_media_copy@1");
+  });
+
+  it("CMO diagnosis rejects a plan that routes to a non-existent playbook", async () => {
+    const bad: AiProvider = {
+      name: "stub",
+      async generate<T>(req: GenerateRequest<T>) {
+        const res = await new StubProvider().generate(req);
+        if (req.schemaName !== "WorkPlan") return res;
+        const out = { ...(res.output as Record<string, unknown>) };
+        (out.workstreams as Record<string, unknown>[])[0].playbook = "magic_billboard@9";
+        const parsed = req.schema.safeParse(out);
+        expect(parsed.success).toBe(false);
+        return res;
+      },
+    };
+    await drive("cmo_brief_diagnosis", 1, bad);
   });
 
   it("blocked preparation skips to a blocked package with questions", async () => {

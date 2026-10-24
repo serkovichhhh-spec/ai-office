@@ -1395,6 +1395,89 @@
     "message_knowledge_ids",
     "delivery_spec_knowledge_id"
    ]
+  },
+  "cmo_brief_diagnosis": {
+   "type": "object",
+   "additionalProperties": false,
+   "properties": {
+    "title": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 200
+    },
+    "objective": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 3000
+    },
+    "audience": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 2000
+    },
+    "channel": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 120
+    },
+    "deliverable_count": {
+     "type": "integer",
+     "minimum": 1,
+     "maximum": 1
+    },
+    "deadline": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 80,
+     "format": "date-time"
+    },
+    "acceptance_criteria": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1500
+     },
+     "minItems": 1,
+     "maxItems": 20
+    },
+    "references": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 2048
+     },
+     "minItems": 0,
+     "maxItems": 20
+    },
+    "context_knowledge_ids": {
+     "type": "array",
+     "items": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 1000
+     },
+     "minItems": 0,
+     "maxItems": 30,
+     "uniqueItems": true
+    },
+    "budget_hint": {
+     "type": "string",
+     "minLength": 1,
+     "maxLength": 200
+    }
+   },
+   "required": [
+    "title",
+    "objective",
+    "audience",
+    "channel",
+    "deliverable_count",
+    "deadline",
+    "acceptance_criteria",
+    "references"
+   ]
   }
  }
 }
