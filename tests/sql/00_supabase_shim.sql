@@ -37,6 +37,12 @@ create table if not exists cmo.agent_runs (
   details jsonb default '{}'::jsonb
 );
 
+create table if not exists cmo.tasks (
+  workspace_key text not null, source text not null default 'workspace', source_id text not null, title text not null,
+  description text, assignee_name text, priority text, lane text, label text, due_text text,
+  source_created_at timestamptz, source_updated_at timestamptz, original_payload jsonb, snapshot_sha256 text,
+  imported_at timestamptz not null default now(), version int not null default 1, runtime_payload jsonb,
+  primary key (workspace_key, source_id));
 -- CMO Space documents + the agent write API (copy of the live cmo.agent_upsert, test-only).
 create table if not exists cmo.space_documents (
   key text primary key, payload jsonb not null default '[]'::jsonb, revision int not null default 1,

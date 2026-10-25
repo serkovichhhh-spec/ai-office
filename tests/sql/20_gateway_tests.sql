@@ -62,8 +62,14 @@ insert into t.tok select 'c1', office.gateway_claim(t.h('gpt'))::text;
 select t.ok('claim returns lease token and envelope',
   (select (v::jsonb->>'claimed')::boolean and length(v::jsonb->>'lease_token') = 64
           and v::jsonb->'envelope'->>'task_id' = '0000000c-0000-4000-8000-000000000001' from t.tok where k = 'c1'));
-select t.ok('second claim refused', office.gateway_claim(t.h('gpt'), '0000000c-0000-4000-8000-000000000001')->>'reason' = 'already_claimed');
-select t.ok('claimed task hidden from list', office.gateway_list(t.h('gpt')) = '[]');
+-- 0015: a second claim by the SAME executor resumes its attempt with a fresh lease token.
+insert into t.tok select 'c1_old', v from t.tok where k = 'c1';
+update t.tok set v = office.gateway_claim(t.h('gpt'), '0000000c-0000-4000-8000-000000000001')::text where k = 'c1';
+select t.ok('second claim by the same executor resumes the same attempt with a new token',
+  (select (n.v::jsonb->>'resumed')::boolean and n.v::jsonb->>'attempt_id' = o.v::jsonb->>'attempt_id'
+          and n.v::jsonb->>'lease_token' <> o.v::jsonb->>'lease_token' and n.v::jsonb->'envelope' is not null
+   from t.tok n, t.tok o where n.k = 'c1' and o.k = 'c1_old'));
+select t.ok('claimed task listed only as yours', (select jsonb_agg(x->>'yours') from jsonb_array_elements(office.gateway_list(t.h('gpt'))) x) = '["true"]');
 select t.ok('no tasks → claimed=false', office.gateway_claim(t.h('gpt'))->>'reason' = 'no_tasks');
 select t.ok('legacy agent_pending skips ChatGPT task',
   not exists (select 1 from office.agent_pending(20) where step_id = '0000000c-0000-4000-8000-000000000001'));
