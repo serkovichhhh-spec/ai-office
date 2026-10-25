@@ -61,6 +61,15 @@ select t.ok('409 after claim does not fail the trigger run or count for the brea
   and exists (select 1 from office.trigger_events e join office.trigger_runs t2 on t2.id = e.trigger_run_id
               where t2.step_id = '0000000c-0000-4000-8000-000000000813' and e.data->>'late' = 'true'));
 
+-- Regression (25.10): the owner page reads the executor columns added in 0012.
+begin;
+select set_config('request.jwt.claims', '{"sub":"22222222-2222-4222-8222-222222222222"}', true);
+set local role authenticated;
+select t.ok('owner can read verified_at / verified_note of executors',
+  (select count(*) > 0 from (select e.id, e.verified_at, e.verified_note from office.executors e
+     where e.workspace_id = (select v from t.ids where k = 'ws_b')) q));
+commit;
+
 \o
 \set QUIET off
 select id, case when ok then 'PASS' else 'FAIL' end as result, name, coalesce(detail, '') as detail from t.results order by id;
