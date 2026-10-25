@@ -1,0 +1,56 @@
+{
+  "schema_version": "Package.v1",
+  "outcome": "escalated",
+  "playbook": "graphic_design_pack",
+  "blocking_questions": [],
+  "sections": [
+    { "kind": "summary", "label": "Підсумок", "version": 1, "content": "Три статичні концепції для Meta/Instagram/Telegram: надійність без світла, гігабіт за 199 грн і механіка «Поторгуємось?». Кожна в 1:1, 4:5 і 9:16." },
+    { "kind": "creatives", "label": "Креативи", "version": 1, "content": [
+      { "id": "creative_1_light", "file_naming": "pavutyna_meta_c1_light_{1x1|4x5|9x16}_v1.png", "adaptation_rules": ["Не розтягувати 1:1: перекомпонувати сцену."],
+        "design": { "id": "design_1",
+          "concept": { "title": "Місто в темряві — ПАВУТИНА світить", "idea": "Павук-маскот тримає єдину світну нитку інтернету, коли навколо темно.", "visual_direction": "Нічне місто з вимкненими вікнами, світна нитка в лапі павука." },
+          "copy": [
+            { "id": "c1_a", "headline": "ІНТЕРНЕТ ПРАЦЮЄ БЕЗ СВІТЛА", "body": "Мережа ПАВУТИНИ має ДБЖ на LiFePo4 на 100% покриття. Перевір, чи твій будинок у зоні.", "cta": "ПЕРЕВІРИТИ ПОКРИТТЯ", "destination": "l.pavutyna.com/s/<код_c1>", "source_refs": [{ "pointer": "/body" }] },
+            { "id": "c1_b", "headline": "КОЛИ ГАСНЕ СВІТЛО — ПАВУТИНА ТРИМАЄ ЗВ'ЯЗОК", "body": "Мережа не зникає разом зі світлом.", "cta": "ПЕРЕВІРИТИ ПОКРИТТЯ" }
+          ],
+          "formats": [
+            { "id": "f1_1x1", "width": 1080, "height": 1080, "aspect_ratio": "1:1", "placement": "Feed 1:1", "duration_seconds": null },
+            { "id": "f1_4x5", "width": 1080, "height": 1350, "aspect_ratio": "4:5", "placement": "Feed 4:5", "duration_seconds": null },
+            { "id": "f1_9x16", "width": 1080, "height": 1920, "aspect_ratio": "9:16", "placement": "Stories/Telegram 9:16", "duration_seconds": null }
+          ],
+          "composition": "Темний navy-фон з нічним містом у розмитті.",
+          "hierarchy": ["Заголовок", "Павук зі світною ниткою", "CTA"],
+          "asset_uses": [{ "asset_id": "pavutyna_logo_white_original", "version": "to_confirm", "purpose": "Біле лого", "rights_knowledge_refs": [{ "pointer": "/body" }] }],
+          "generation_prompts": [{ "id": "gp1", "prompt": "Cinematic night cityscape, deep navy background, no text.", "avoid": "Text, logos", "purpose": "Фон", "reference_assets": [] }],
+          "production_checks": ["Виноска про ONU і роутер присутня."],
+          "brand_knowledge_refs": [{ "pointer": "/body" }]
+        } },
+      { "id": "creative_2_gigabit",
+        "design": {
+          "concept": { "title": "НЕЗЛАМНИЙ ГІГАБІТ — 199 грн", "idea": "Павук тримає гігантську цифру 199." },
+          "copy": [{ "headline": "НЕЗЛАМНИЙ ГІГАБІТ — 199 ГРН/МІС", "body": "1000 Мбіт/с за 199 грн/міс 12 місяців, підключення 1 грн.", "cta": "ПІДКЛЮЧИТИ" }],
+          "formats": [
+            { "width": 1080, "height": 1080, "aspect_ratio": "1:1", "placement": "Feed 1:1" },
+            { "width": 1080, "height": 1920, "aspect_ratio": "9:16", "placement": "Stories 9:16" }
+          ]
+        } }
+    ] },
+    { "kind": "export_checklist", "label": "Чекліст експорту", "version": 1, "content": ["Лого й маскот — лише з оригінальних файлів.", "Експорт PNG sRGB."] },
+    { "kind": "assumptions", "label": "Припущення", "version": 1, "content": [{ "id": "h_formats", "statement": "Розміри 1080×1080/1350/1920 прийняті як стандартні.", "validation": "Звірити з вимогами Meta." }] },
+    { "kind": "claims_needing_source", "label": "Потрібно підтвердити", "version": 1, "content": [{ "id": "claim_100h", "text": "«100+ годин роботи без світла»", "disposition": "excluded" }] },
+    { "kind": "blocking_questions", "label": "Блокуючі питання", "version": 1, "content": [] }
+  ],
+  "review": {
+    "verdict": "escalate",
+    "summary": "Концепції відповідають бренду, але потрібні специфікації, файли лого/маскота, трекінг-коди й підтвердження промо.",
+    "scores": [{ "criterion": "brand", "score": 5, "comment": "Узгоджено з брендбуком." }, { "criterion": "execution", "score": 2, "comment": "Умовні asset_id." }],
+    "open_issues": [
+      { "target": "/creatives/0/design/formats/0", "severity": "critical", "criterion": "evidence", "problem": "\"width\":1080,\"height\":1080", "fix": "Додати офіційні специфікації Meta/Telegram у знання або позначити розміри TBD." },
+      { "target": "/creatives/0/design/asset_uses", "severity": "major", "criterion": "execution", "problem": "\"asset_id\":\"pavutyna_logo_white_original\"", "fix": "Надати реальні файли лого й маскота з підтвердженими правами." },
+      { "target": "/creatives/1/design/copy/0/body", "severity": "minor", "criterion": "specialist", "problem": "Довгий юридичний блок", "fix": "Скоротити юридичний блок для мобільного макета." }
+    ]
+  },
+  "unsupported_claims": ["«100+ годин роботи без світла» (прибрано з матеріалу)", "Порівняння з конкурентами (прибрано з матеріалу)"],
+  "sources_used": [],
+  "handoff": { "to": "graphic_designer", "note": "Передати креативи дизайнеру" }
+}

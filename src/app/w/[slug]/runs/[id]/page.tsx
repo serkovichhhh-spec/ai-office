@@ -7,7 +7,9 @@ import { HANDOFF_STATUS, ROLE_LABEL, STEP_STATUS, ProviderBadge, StatusPill, Stu
 import { EXECUTOR_LABEL } from "@/lib/queries";
 import { cancelRunAction } from "../../../../actions";
 import { DecisionPanel } from "./DecisionPanel";
-import { PackageView, SectionView, type PackageV1 } from "./PackageView";
+import { DraftView, PackageView, ReviewDetails, type PackageV1 } from "./PackageView";
+import { OwnerBanner, OwnerChecklist, type ChainStep } from "./OwnerPanel";
+import { answerTemplate, excludedClaims, ownerChecklist, ownerState } from "@/lib/ui/package-view-model";
 import { PLAYBOOKS } from "@/lib/orchestrator/registry";
 import { ENUM_LABEL } from "@/lib/orchestrator/catalog";
 
@@ -104,196 +106,182 @@ export default async function RunPage({ params }: { params: Promise<{ slug: stri
     unsupported_claims: string[]; sources_used: { title: string; url: string | null }[];
   };
 
+  const checklist = pkgV1 ? ownerChecklist(pkgV1) : [];
+  const excluded = pkgV1 ? excludedClaims(pkgV1) : [];
+  const waiting = d.steps.find((s) => s.status === "awaiting_agent" || s.status === "running");
+  const workingText = waiting
+    ? waiting.status === "awaiting_agent"
+      ? awaitingExecutor === "chatgpt"
+        ? `«${stepLabel(waiting.step_key)}» чекає на ChatGPT. Відкрий ChatGPT з AI Office і напиши «візьми задачі AI Office».`
+        : `«${stepLabel(waiting.step_key)}» чекає на Claude — він запуститься автоматично.`
+      : `${role(waiting.agent_role)} працює: ${stepLabel(waiting.step_key)}.`
+    : undefined;
+  const state = ownerState(d.run.status, pkgV1?.outcome, checklist.length, workingText);
+  const steps = new Map<string, ChainStep>();
+  for (const s of d.steps) {
+    const st: ChainStep["state"] = s.status === "succeeded" ? "done" : s.status === "running" || s.status === "awaiting_agent" ? "active" : s.status === "failed" ? "bad" : "wait";
+    steps.set(s.step_key, { key: s.step_key, label: stepLabel(s.step_key), state: st });
+  }
+  const chain = [...steps.values(), { key: "_owner", label: "Твоє рішення", state: d.run.status === "needs_approval" ? "active" : ["approved", "handoff_queued"].includes(d.run.status) ? "done" : "wait" } as ChainStep];
+  const decide = canDecide && latest
+    ? { artifactId: latest.id, version: latest.version, canApprove: !pkgV1?.outcome || pkgV1.outcome === "ready_for_approval", template: checklist.length ? answerTemplate(checklist) : undefined }
+    : null;
+
   return (
     <>
       <LiveRefresh active={active} intervalMs={2500} />
       <p className="small" style={{ marginBottom: 10 }}><a href={`/w/${ws.slug}`}>← Офіс</a></p>
       <div className="run-head">
-        <h1>{d.brief.title}</h1>
+        <div>
+          <h1>{d.brief.title}</h1>
+          <p className="small muted">{spec?.label ?? d.brief.playbook_key} · {when(d.run.created_at)}{latest ? ` · версія ${latest.version}` : ""}</p>
+        </div>
         <div className="meta">
-          {isStub ? <StubBadge /> : <ProviderBadge provider={d.run.provider} />}
+          {isStub && <StubBadge />}
           <StatusPill status={d.run.status} />
           {canCancel && (
             <form action={cancelRunAction}>
               <input type="hidden" name="run_id" value={d.run.id} />
-              <button className="btn danger">Скасувати</button>
+              <button className="btn link">Скасувати</button>
             </form>
           )}
         </div>
       </div>
-      <div className="facts">
-        <div className="fact"><b>{usd(d.run.cost_usd)}</b><span>витрати з {usd(d.run.budget_usd)}</span></div>
-        <div className="fact"><b>{Number(d.run.tokens_in) + Number(d.run.tokens_out)}</b><span>токенів</span></div>
-        <div className="fact"><b>{d.steps.filter((s) => s.status === "succeeded").length}/{d.steps.length}</b><span>кроків виконано</span></div>
-        <div className="fact"><b>v{d.run.revision}</b><span>версія пакета</span></div>
-        <div className="fact"><b>{when(d.run.created_at)}</b><span>створено</span></div>
-      </div>
 
-      {isStub && (
-        <p className="notice" style={{ marginTop: 16 }}>
-          Модель не підключена: тексти нижче — шаблони, щоб перевірити процес. Черга, кроки, версії, затвердження й передача в продакшн — справжні.
-        </p>
-      )}
-      {awaitingAgent && (
-        <p className="notice" style={{ marginTop: 16 }} role="status">
-          {awaitingExecutor === "chatgpt"
-            ? "Наступний крок чекає на ChatGPT. Відкрий ChatGPT з підключеним AI Office і напиши «візьми задачі AI Office» — сторінка оновиться сама."
-            : "Наступний крок чекає на Claude. Запусти задачу «AI Office: відпрацювати чергу» в Claude або напиши в чаті «запусти офіс» — сторінка оновиться сама."}
-        </p>
-      )}
-      {d.run.status === "failed" && (
-        <p className="notice bad" style={{ marginTop: 16 }}>Запуск зупинився: {d.run.error_message ?? d.run.error_code}</p>
-      )}
+      <OwnerBanner state={state} chain={chain} />
+      {isStub && <p className="notice" style={{ marginTop: 12 }}>Модель не підключена: тексти — шаблони для перевірки процесу.</p>}
 
       <div className="cols">
         <div>
-          {canDecide && latest && (
-            <div className="mobile-first-decision">
-              <DecisionPanel artifactId={latest.id} version={latest.version} canApprove={!pkgV1?.outcome || pkgV1.outcome === "ready_for_approval"} />
-            </div>
-          )}
+          {decide && <div className="mobile-first-decision"><DecisionPanel {...decide} /></div>}
+          <OwnerChecklist items={checklist} excluded={excluded} reviewSummary={pkgV1?.review?.summary} />
 
           <section className="panel" aria-labelledby="deliv-title">
-            <div className="panel-head">
-              <h2 id="deliv-title">{latest ? `Пакет v${latest.version}` : "Результат"}</h2>
-              {latest && <span className="muted small">хеш {latest.content_hash.slice(0, 10)}</span>}
-            </div>
+            <div className="panel-head"><h2 id="deliv-title">{latest ? "Результат" : "Чернетка"}</h2></div>
             {pkgV1 && <PackageView pkg={pkgV1} />}
             {specDraft?.a && (
               <>
-                <p className="muted small" style={{ marginBottom: 10 }}>Проміжний результат «{specDraft.s.title}», ще не пройшов рев'ю:</p>
-                <SectionView content={specDraft.a.content as Record<string, unknown>} />
+                <p className="muted small" style={{ marginBottom: 10 }}>Проміжний результат «{specDraft.s.title}», ще не пройшов рецензію.</p>
+                <DraftView content={specDraft.a.content as Record<string, unknown>} />
               </>
             )}
-            {!content && !pkgV1 && !specDraft && !draftScripts && <p className="empty">{active ? "Команда працює — результат з’явиться тут." : "Результату немає."}</p>}
+            {!content && !pkgV1 && !specDraft && !draftScripts && <p className="empty">{active ? "Команда працює — результат зʼявиться тут." : "Результату немає."}</p>}
             {!content && draftScripts?.scripts && (
               <>
-                <p className="muted small" style={{ marginBottom: 10 }}>Чернетка сценаріїв, ще не пройшла рев'ю:</p>
+                <p className="muted small" style={{ marginBottom: 10 }}>Чернетка сценаріїв, ще не пройшла рецензію.</p>
                 {draftScripts.scripts.map((s, i) => <ScriptCard key={i} s={s} i={i} />)}
               </>
             )}
             {content && (
               <>
-                <h3>Стратегія</h3>
-                <p style={{ marginTop: 6 }}>{content.strategy_summary}</p>
-                <div style={{ marginTop: 8 }}>
+                <p className="lead">{content.strategy_summary}</p>
+                <h3 style={{ margin: "18px 0 10px" }}>Сценарії</h3>
+                {content.scripts.map((s, i) => <ScriptCard key={i} s={s} i={i} />)}
+                {content.unsupported_claims.length > 0 && (
+                  <p className="notice" style={{ marginTop: 12 }}><b>Підтвердь перед публікацією:</b> {content.unsupported_claims.join("; ")}</p>
+                )}
+                <details className="quiet">
+                  <summary>Стратегія й кути ({content.angles.length})</summary>
                   {content.angles.map((a, i) => (
                     <div className="angle" key={i}>
                       <b>{a.title}</b>
                       <p className="small">{a.insight}</p>
                       <p className="small muted">Хук: {a.hook_idea}. {a.why_it_works}</p>
-                      {a.evidence.length > 0 && <p className="small muted">Джерела: {a.evidence.join(", ")}</p>}
                     </div>
                   ))}
-                </div>
-                <h3 style={{ margin: "18px 0 10px" }}>Сценарії</h3>
-                {content.scripts.map((s, i) => <ScriptCard key={i} s={s} i={i} />)}
-                {content.review && (
-                  <>
-                    <h3 style={{ margin: "18px 0 6px" }}>Рев'ю</h3>
-                    <p className="small">{content.review.summary}</p>
-                    {content.review.open_issues.length > 0 && (
-                      <ul className="small">{content.review.open_issues.map((x, i) => <li key={i}>#{x.script_index + 1} [{x.severity}] {x.issue}</li>)}</ul>
-                    )}
-                  </>
-                )}
-                {content.unsupported_claims.length > 0 && (
-                  <p className="notice" style={{ marginTop: 12 }}>
-                    <b>Потрібно підтвердити перед публікацією:</b> {content.unsupported_claims.join("; ")}
-                  </p>
-                )}
-                {content.sources_used.length > 0 && (
-                  <p className="small muted" style={{ marginTop: 12 }}>
-                    Знання workspace, доступні команді: {content.sources_used.map((s) => s.title).join(", ")}
-                  </p>
-                )}
+                </details>
               </>
             )}
           </section>
-
-          <section className="panel" aria-labelledby="steps-title">
-            <div className="panel-head"><h2 id="steps-title">Кроки</h2></div>
-            <div className="scroll-x">
-              <table className="steps-table">
-                <thead><tr><th>Крок</th><th>Агент</th><th>Статус</th><th>Модель</th><th>Витрати</th><th>Час</th></tr></thead>
-                <tbody>
-                  {d.steps.map((s) => (
-                    <tr key={s.id}>
-                      <td>{stepLabel(s.step_key)}{s.cycle > 1 ? ` #${s.cycle}` : ""}{s.attempt > 1 ? <span className="muted"> (спроба {s.attempt}/{s.max_attempts})</span> : null}
-                        {s.error && <div className="error small">{s.error}</div>}</td>
-                      <td>{role(s.agent_role)}</td>
-                      <td><StatusPill status={s.status} map={STEP_STATUS} /></td>
-                      <td>{modelLabel(s.provider, s.model)}</td>
-                      <td>{s.provider === "code" ? "—" : usd(s.cost_usd)}</td>
-                      <td className="muted">{s.started_at ? clock(s.started_at) : "—"}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </section>
         </div>
 
-        <div>
-          {canDecide && latest && <div className="desktop-decision"><DecisionPanel artifactId={latest.id} version={latest.version} canApprove={!pkgV1?.outcome || pkgV1.outcome === "ready_for_approval"} /></div>}
-
+        <aside>
+          {decide && <div className="desktop-decision"><DecisionPanel {...decide} /></div>}
           {d.handoff && (
             <section className="panel">
-              <div className="panel-head"><h2>Продакшн</h2><span className="pill ok">{HANDOFF_STATUS[d.handoff.status]}</span></div>
-              <p className="small muted">Пакет у черзі з контрактом handoff.v1. Локальний /produce забере його, коли буде підключено міст.</p>
-              <details style={{ marginTop: 10 }}>
-                <summary>Дані передачі</summary>
-                <pre className="json">{JSON.stringify({ ...d.handoff.payload, approved_artifact: { ...(d.handoff.payload.approved_artifact as object), content: "…" } }, null, 2)}</pre>
-              </details>
+              <div className="panel-head"><h2>Передано</h2><span className="pill ok">{HANDOFF_STATUS[d.handoff.status]}</span></div>
+              <p className="small muted">Задача в CMO Space → «Виконання».</p>
             </section>
           )}
-
           <section className="panel">
-            <div className="panel-head"><h2>Бриф</h2></div>
-            <p>{d.brief.objective}</p>
-            <dl className="small" style={{ marginTop: 10, display: "grid", gridTemplateColumns: "auto 1fr", gap: "4px 12px" }}>
-              {d.brief.audience && (<><dt className="muted">Аудиторія</dt><dd style={{ margin: 0 }}>{d.brief.audience}</dd></>)}
-              {d.brief.channel && (<><dt className="muted">Канал</dt><dd style={{ margin: 0 }}>{d.brief.channel}</dd></>)}
-              <dt className="muted">Варіантів</dt><dd style={{ margin: 0 }}>{d.brief.deliverable_count}</dd>
-              {d.brief.deadline && (<><dt className="muted">Дедлайн</dt><dd style={{ margin: 0 }}>{d.brief.deadline}</dd></>)}
-              {spec && (<><dt className="muted">Тип задачі</dt><dd style={{ margin: 0 }}>{spec.label}</dd></>)}
-              {spec?.fields.map((f) => d.brief.fields?.[f.key] !== undefined && d.brief.fields[f.key] !== "" ? (
-                <Fragment key={f.key}><dt className="muted">{f.label}</dt><dd style={{ margin: 0, whiteSpace: "pre-line" }}>{showField(d.brief.fields[f.key])}</dd></Fragment>
-              ) : null)}
-            </dl>
-            {d.brief.acceptance_criteria.length > 0 && (
-              <ul className="small" style={{ marginTop: 8 }}>{d.brief.acceptance_criteria.map((c, i) => <li key={i}>{c}</li>)}</ul>
-            )}
+            <details className="quiet" open={!latest}>
+              <summary>Бриф</summary>
+              <p style={{ marginTop: 8 }}>{d.brief.objective}</p>
+              <dl className="small brief-dl">
+                {d.brief.audience && (<><dt className="muted">Аудиторія</dt><dd>{d.brief.audience}</dd></>)}
+                {d.brief.channel && (<><dt className="muted">Канал</dt><dd>{d.brief.channel}</dd></>)}
+                {d.brief.deadline && (<><dt className="muted">Дедлайн</dt><dd>{d.brief.deadline}</dd></>)}
+                {spec?.fields.map((f) => d.brief.fields?.[f.key] !== undefined && d.brief.fields[f.key] !== "" ? (
+                  <Fragment key={f.key}><dt className="muted">{f.label}</dt><dd style={{ whiteSpace: "pre-line" }}>{showField(d.brief.fields[f.key])}</dd></Fragment>
+                ) : null)}
+              </dl>
+              {d.brief.acceptance_criteria.length > 0 && (
+                <ul className="small" style={{ marginTop: 8 }}>{d.brief.acceptance_criteria.map((c, i) => <li key={i}>{c}</li>)}</ul>
+              )}
+            </details>
           </section>
-
           {d.approvals.length > 0 && (
             <section className="panel">
-              <div className="panel-head"><h2>Рішення</h2></div>
+              <div className="panel-head"><h2>Твої рішення</h2></div>
               <ul className="list">
                 {d.approvals.map((a) => (
                   <li key={a.id} className="row" style={{ display: "block" }}>
-                    <b>{DECISION[a.decision]}</b> <span className="muted small">{when(a.created_at)}, {a.by_me ? "ви" : "учасник команди"}</span>
-                    {a.rationale && <p className="small">{a.rationale}</p>}
+                    <b>{DECISION[a.decision]}</b> <span className="muted small">{when(a.created_at)}{a.by_me ? "" : ", учасник команди"}</span>
+                    {a.rationale && <p className="small" style={{ whiteSpace: "pre-line" }}>{a.rationale}</p>}
                   </li>
                 ))}
               </ul>
             </section>
           )}
-
-          <section className="panel" aria-labelledby="tl-title">
-            <div className="panel-head"><h2 id="tl-title">Хронологія</h2></div>
-            <ol className="timeline">
-              {d.events.map((e) => (
-                <li key={e.id}>
-                  <time dateTime={e.created_at}>{clock(e.created_at)}</time>
-                  <span className={`dot ${dotTone(e.kind)}`} aria-hidden="true" />
-                  <span>{EVENT_TEXT[e.kind]?.(e) ?? e.kind}</span>
-                </li>
-              ))}
-            </ol>
-          </section>
-        </div>
+        </aside>
       </div>
+
+      <details className="panel tech">
+        <summary>Технічні деталі: кроки, витрати, хронологія</summary>
+        <div className="facts" style={{ marginTop: 12 }}>
+          <div className="fact"><b>{usd(d.run.cost_usd)}</b><span>витрати з {usd(d.run.budget_usd)}</span></div>
+          <div className="fact"><b>{Number(d.run.tokens_in) + Number(d.run.tokens_out)}</b><span>токенів</span></div>
+          <div className="fact"><b>{d.steps.filter((s) => s.status === "succeeded").length}/{d.steps.length}</b><span>кроків</span></div>
+          <div className="fact"><b><ProviderBadge provider={d.run.provider} /></b><span>модель</span></div>
+        </div>
+        {d.run.status === "failed" && <p className="notice bad" style={{ marginTop: 12 }}>Помилка: {d.run.error_message ?? d.run.error_code}</p>}
+        {pkgV1?.review && <div style={{ marginTop: 14 }}><ReviewDetails review={pkgV1.review} /></div>}
+        <div className="scroll-x" style={{ marginTop: 14 }}>
+          <table className="steps-table">
+            <thead><tr><th>Крок</th><th>Агент</th><th>Статус</th><th>Модель</th><th>Витрати</th><th>Час</th></tr></thead>
+            <tbody>
+              {d.steps.map((s) => (
+                <tr key={s.id}>
+                  <td>{stepLabel(s.step_key)}{s.cycle > 1 ? ` #${s.cycle}` : ""}{s.attempt > 1 ? <span className="muted"> (спроба {s.attempt}/{s.max_attempts})</span> : null}
+                    {s.error && <div className="error small">{s.error}</div>}</td>
+                  <td>{role(s.agent_role)}</td>
+                  <td><StatusPill status={s.status} map={STEP_STATUS} /></td>
+                  <td>{modelLabel(s.provider, s.model)}</td>
+                  <td>{s.provider === "code" ? "—" : usd(s.cost_usd)}</td>
+                  <td className="muted">{s.started_at ? clock(s.started_at) : "—"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <h3 style={{ margin: "16px 0 8px" }}>Хронологія</h3>
+        <ol className="timeline">
+          {d.events.map((e) => (
+            <li key={e.id}>
+              <time dateTime={e.created_at}>{clock(e.created_at)}</time>
+              <span className={`dot ${dotTone(e.kind)}`} aria-hidden="true" />
+              <span>{EVENT_TEXT[e.kind]?.(e) ?? e.kind}</span>
+            </li>
+          ))}
+        </ol>
+        {d.handoff && (
+          <details style={{ marginTop: 10 }}>
+            <summary>Дані передачі (handoff.v1)</summary>
+            <pre className="json">{JSON.stringify({ ...d.handoff.payload, approved_artifact: { ...(d.handoff.payload.approved_artifact as object), content: "…" } }, null, 2)}</pre>
+          </details>
+        )}
+        {latest && <p className="small muted" style={{ marginTop: 10 }}>Хеш версії {latest.content_hash.slice(0, 10)}</p>}
+      </details>
     </>
   );
 }
