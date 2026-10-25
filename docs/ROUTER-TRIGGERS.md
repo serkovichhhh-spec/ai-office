@@ -66,6 +66,8 @@ HTTP 200/202 від провайдера означає тільки `trigger_ac
 Дозволено ЛИШЕ 5 інструментів конектора AI Office: office_list_tasks, office_get_task, office_claim_task,
 office_submit_result, office_get_team_status. Навіть якщо інші конектори видно в сесії, вони заборонені:
 жодних shell, браузера, файлів, HTTP, Supabase, SQL, Meta Ads, Google, медіа чи платних API.
+Єдиний виняток: якщо відповідь інструмента AI Office завелика і сесія зберегла її у файл, прочитай саме цей файл
+інструментом Read (частинами, якщо треба). Інші файли не читай і нічого не записуй.
 Якщо потрібного інструмента немає — заверши CONNECTOR_UNAVAILABLE.
 
 1. office_get_team_status({}). Продовжуй лише якщо you.label = claude_main, you.provider = anthropic,

@@ -45,6 +45,32 @@ set role authenticated;
 select t.throws('users cannot run the import', $q$select office.cmo_import_tick(1)$q$, '42501');
 reset role;
 
+-- 0016: a reviewer step is not moved to the executor that authored work in the same run.
+insert into t.tok values ('nsr_claude', office.create_executor('gtu', 'claude_session', 'NSR Claude')),
+                         ('nsr_gpt', office.create_executor('gtu', 'chatgpt', 'NSR ChatGPT'));
+update office.executors x set allowed_seats = (select array_agg(a.role_key) from office.agents a where a.workspace_id = x.workspace_id),
+  verified_at = now() where name in ('NSR Claude', 'NSR ChatGPT');
+update office.executors set revoked_at = now() where workspace_id = (select v from t.ids where k = 'ws_b')
+  and name not in ('NSR Claude', 'NSR ChatGPT') and revoked_at is null;
+insert into office.briefs (id, workspace_id, title, objective, status)
+select '0000000a-0000-4000-8000-000000000090', v, 'NSR brief', 'Перевірити незалежність', 'active' from t.ids where k = 'ws_b';
+insert into office.runs (id, workspace_id, brief_id, playbook_key, status, budget_usd, idempotency_key)
+select '0000000b-0000-4000-8000-000000000090', v, '0000000a-0000-4000-8000-000000000090', 'reels_concepts', 'running', 1, 'nsr-run-0090'
+from t.ids where k = 'ws_b';
+insert into office.steps (id, run_id, workspace_id, step_key, agent_role, status, executor, agent_request)
+select ('0000000c-0000-4000-8000-0000000009' || v2.n)::uuid, '0000000b-0000-4000-8000-000000000090', i.v, v2.sk, v2.role, v2.st, v2.ex,
+       '{"schemaName":"x","system":"s","user":"u","jsonSchema":{"type":"object"}}'
+from t.ids i, (values ('01','build','copywriter','succeeded','claude_session'), ('02','review','reviewer','awaiting_agent','chatgpt'))
+  v2(n, sk, role, st, ex) where i.k = 'ws_b';
+insert into office.execution_attempts (step_id, run_id, workspace_id, executor_id, lease_token_hash, lease_expires_at, state)
+select '0000000c-0000-4000-8000-000000000901', '0000000b-0000-4000-8000-000000000090', v, (select id from office.executors where name = 'NSR Claude'),
+       repeat('b', 64), now(), 'validated' from t.ids where k = 'ws_b';
+insert into office.provider_limits (workspace_id, provider, limited_until) select v, 'openai', now() + interval '1 hour' from t.ids where k = 'ws_b';
+select office.router_tick();
+select t.ok('review is not moved to the author of the run (stops instead)',
+  (select executor = 'chatgpt' and route_blocked = 'no_verified_executor' from office.steps where id = '0000000c-0000-4000-8000-000000000902'));
+delete from office.provider_limits;
+
 \o
 \set QUIET off
 select id, case when ok then 'PASS' else 'FAIL' end as result, name, coalesce(detail, '') as detail from t.results order by id;
