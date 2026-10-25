@@ -11,6 +11,7 @@ export interface GatewayReport {
 
 /**
  * One pass of the Capability Router + Trigger Gateway, run after every worker tick:
+ * 0. office.cmo_import_tick() — CMO Space tasks assigned to «AI Office» → briefs + runs;
  * 1. office.router_tick()      — move steps off exhausted/paused/forbidden executors (verified fallback only);
  * 2. office.trigger_expire()   — timeouts (no claim in 10 min, no report, closed steps);
  * 3. office.trigger_dispatch() — reserve steps and pick channels; the adapters wake executors;
@@ -18,6 +19,9 @@ export interface GatewayReport {
  */
 export async function runTriggerGateway(sql: postgres.Sql, deps: AdapterDeps & { log?: (m: string, x?: Record<string, unknown>) => void }): Promise<GatewayReport> {
   const log = deps.log ?? (() => {});
+  // CMO Space → AI Office: tasks assigned to «AI Office» become briefs + runs (before routing/dispatch).
+  const [{ r: imported }] = await sql<{ r: Record<string, unknown> }[]>`select office.cmo_import_tick(3) as r`;
+  if (Number(imported?.imported ?? 0) > 0) log("cmo_import", imported);
   const [{ r: router }] = await sql<{ r: Record<string, unknown> }[]>`select office.router_tick() as r`;
   const [{ n: expired }] = await sql<{ n: number }[]>`select office.trigger_expire() as n`;
   const report: GatewayReport = { router, expired, dispatched: 0, outcomes: {} };
