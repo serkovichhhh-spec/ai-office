@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.1.3 — 2026-10-25
+
+### Виправлено
+- Сторінка робочого простору падала з «permission denied for table executors»: власнику не було видано права читати нові колонки `verified_at` / `verified_note` (`0014_office_executor_verified_grant`). Додано регресійний тест.
+
 ## 1.1.2 — 2026-10-25
 
 ### Виправлено
