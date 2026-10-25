@@ -229,6 +229,79 @@ async function main() {
           && recovered.agent_request === null && recovered.agent_response === null);
       } finally { await locking.end(); }
     }
+    // ---- 0012 acceptance (§17.1): Claude usage limit → the step moves to verified ChatGPT, is woken by its
+    // channel and reaches task_completed; Claude's channel is never called; no other host is called.
+    {
+      const { runTriggerGateway } = await import("../src/lib/triggers/gateway");
+      await su`insert into office.workspaces (slug, name) values ('route', 'Route test')`;
+      const [{ id: rws }] = await su`select id from office.workspaces where slug = 'route'`;
+      await su`select office.seed_default_agents(${rws})`;
+      await su`update office.agents set default_executor = 'chatgpt' where workspace_id = ${rws} and role_key in ('strategist','reviewer')`;
+      await su`insert into office.workspace_members (workspace_id, user_id, role) values (${rws}, ${OWNER}, 'owner')`;
+      const [{ t: rGptTok }] = await su`select office.create_executor('route', 'chatgpt', 'Route ChatGPT') as t`;
+      const [{ t: rClaudeTok }] = await su`select office.create_executor('route', 'claude_session', 'Route Claude') as t`;
+      await su`update office.executors x set allowed_seats = (select array_agg(a.role_key) from office.agents a where a.workspace_id = x.workspace_id),
+                 verified_at = now() where x.workspace_id = ${rws}`;
+      const rGpt = { sql: app, tokenHash: hashToken(rGptTok) };
+      await su`insert into office.trigger_channels (workspace_id, label, adapter, executor_id, enabled, config)
+               select ${rws}, 'claude-routine', 'claude_routine', id, true, '{"env_prefix":"CLAUDE_ROUTINE","daily_cap":5}'::jsonb
+               from office.executors where name = 'Route Claude'`;
+      await su`insert into office.trigger_channels (workspace_id, label, adapter, executor_id, enabled, config)
+               select ${rws}, 'chatgpt-agent', 'chatgpt_agent', id, true, '{"env_prefix":"CHATGPT_AGENT","daily_cap":10}'::jsonb
+               from office.executors where name = 'Route ChatGPT'`;
+      await asUser(app, OWNER, (tx) => tx`select office.set_triggers_enabled(${rws}::uuid, true)`);
+
+      const calls: string[] = [];
+      const fakeFetch = (async (url: string) => {
+        calls.push(String(url));
+        return String(url).includes("api.chatgpt.com")
+          ? new Response(JSON.stringify({ agent_trigger_run_id: `apirun_${calls.length}`, conversation_url: "https://chatgpt.com/c/x" }), { status: 202 })
+          : new Response(JSON.stringify({ claude_code_session_id: `session_${calls.length}`, claude_code_session_url: "https://claude.ai/code/session_x" }), { status: 200 });
+      }) as unknown as typeof fetch;
+      const env = {
+        CLAUDE_ROUTINE_FIRE_URL: "https://api.anthropic.com/v1/claude_code/routines/trig_01TEST/fire", CLAUDE_ROUTINE_TOKEN: "sk-ant-oat01-test",
+        CHATGPT_AGENT_TRIGGER_ID: "agtch_test", CHATGPT_AGENT_TOKEN: "test",
+      };
+      const gateway = () => runTriggerGateway(app, { fetch: fakeFetch, env });
+      const rRun = await asUser(app, OWNER, async (tx) => {
+        const [{ id: b }] = await tx`select office.create_brief(${rws}, ${tx.json({ title: "Маршрутизація", objective: "Перевірити резерв при ліміті Claude", deliverable_count: 1 })}) as id`;
+        const [{ id }] = await tx`select office.submit_brief(${b}, 'e2e-route-0001') as id`;
+        return id as string;
+      });
+      const doStep = async (key: string) => {
+        const [st] = await su`select id from office.steps where run_id = ${rRun} and step_key = ${key} and status = 'awaiting_agent'`;
+        const claim = (await tool(rGpt, "office_claim_task", { task_id: st.id })).structuredContent;
+        const ok = (await tool(rGpt, "office_submit_result", { task_id: st.id, attempt_id: claim.attempt_id, lease_token: claim.lease_token,
+          result: await answerFor(st.id) })).structuredContent;
+        await tick(app, session, { workerId: "e2e-route" });
+        return { id: st.id as string, ok: ok.accepted === true };
+      };
+
+      await tick(app, session, { workerId: "e2e-route" });              // strategy parked for ChatGPT
+      const g1 = await gateway();
+      check("router: ChatGPT channel woken for its own step", g1.outcomes.accepted === 1 && calls.at(-1)!.includes("api.chatgpt.com/v1/workspace_agents/agtch_test/trigger"), { g1, calls });
+      const s1 = await doStep("strategy");
+      check("router: strategy done by ChatGPT", s1.ok);
+      const [t1] = await su`select last_event from office.trigger_runs where step_id = ${s1.id}`;
+      check("router: woken step reaches task_completed", t1?.last_event === "task_completed", t1);
+
+      // scripts is parked for Claude now; Claude's limit is reached (owner marks it / USAGE_LIMIT_REACHED).
+      await asUser(app, OWNER, (tx) => tx`select office.set_provider_limit(${rws}::uuid, 'anthropic', now() + interval '5 hours', 'USAGE_LIMIT_REACHED')`);
+      const before = calls.length;
+      const started = Date.now();
+      const g2 = await gateway();
+      const [sc] = await su`select id, executor, routed_from from office.steps where run_id = ${rRun} and step_key = 'scripts'`;
+      check("§17.1: Claude step rerouted to ChatGPT within one gateway pass (≤ 2 min)", sc.executor === "chatgpt" && sc.routed_from === "claude_session"
+        && Date.now() - started < 120_000 && (g2.router as Any)?.rerouted >= 1, { sc, g2 });
+      check("§17.1: Claude channel is not called while the limit lasts", calls.slice(before).every((u) => !u.includes("anthropic.com")), calls.slice(before));
+      const s2 = await doStep("scripts");
+      const [t2] = await su`select t.last_event, c.label from office.trigger_runs t join office.trigger_channels c on c.id = t.channel_id where t.step_id = ${s2.id}`;
+      check("§17.1: rerouted step reaches task_completed via ChatGPT", s2.ok && t2?.last_event === "task_completed" && t2.label === "chatgpt-agent", t2);
+      const [att] = await su`select e.kind from office.execution_attempts a join office.executors e on e.id = a.executor_id where a.step_id = ${s2.id} and a.state = 'validated'`;
+      check("§17.1: the artifact credits the real executor", att?.kind === "chatgpt", att);
+      check("no host other than the two trigger APIs was called", calls.every((u) => u.startsWith("https://api.chatgpt.com/") || u.startsWith("https://api.anthropic.com/")), calls);
+    }
+
     await app.end();
   } finally {
     await su.end();

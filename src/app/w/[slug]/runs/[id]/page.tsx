@@ -19,6 +19,14 @@ interface Script {
   scenes: { shot: string; on_screen_text: string; voiceover: string }[]; claims_needing_source: string[];
 }
 
+const EXEC: Record<string, string> = { claude_session: "Claude", chatgpt: "ChatGPT", grok: "Grok", human: "людині" };
+const ROUTE_REASON: Record<string, string> = {
+  provider_limit: "вичерпано ліміт сервісу",
+  channel_paused: "канал запуску на паузі",
+  data_policy: "політика даних",
+  no_executor_for_seat: "ніхто не має цієї ролі",
+  not_independent: "потрібен незалежний рецензент",
+};
 const EVENT_TEXT: Record<string, (e: RunDetail["events"][number]) => string> = {
   "run.created": () => "Бриф передано команді",
   "step.started": (e) => `${role(e.agent_role)} почав: ${stepLabel(String(e.payload.step))}${Number(e.payload.attempt) > 1 ? ` (спроба ${e.payload.attempt})` : ""}`,
@@ -32,6 +40,15 @@ const EVENT_TEXT: Record<string, (e: RunDetail["events"][number]) => string> = {
   "approval.recorded": (e) => `Рішення: ${DECISION[String(e.payload.decision)] ?? e.payload.decision} (v${e.payload.version})`,
   "handoff.queued": () => "Передано в чергу продакшну",
   "cmo_sync.done": () => "Задачу створено в CMO Space («Виконання»)",
+  "route.fallback": (e) => `Крок «${e.payload.step}» передано ${EXEC[String(e.payload.to)] ?? e.payload.to} замість ${EXEC[String(e.payload.from)] ?? e.payload.from}: ${ROUTE_REASON[String(e.payload.reason)] ?? e.payload.reason}`,
+  "route.restored": (e) => `Крок «${e.payload.step}» повернуто ${EXEC[String(e.payload.to)] ?? e.payload.to}`,
+  "route.blocked": (e) => `Крок «${e.payload.step}» зупинено: немає перевіреного виконавця (${ROUTE_REASON[String(e.payload.reason)] ?? e.payload.reason})`,
+  "route.unblocked": (e) => `Крок «${e.payload.step}» знову може виконуватись`,
+  "trigger.accepted": (e) => `Автозапуск: ${e.payload.channel} прийняв задачу`,
+  "trigger.completed": (e) => `Автозапуск: ${e.payload.channel} виконав задачу`,
+  "trigger.failed": (e) => `Автозапуск не вдався (${e.payload.channel}: ${e.payload.code ?? "помилка"})`,
+  "trigger.expired": (e) => `Автозапуск: ${e.payload.channel} не взяв задачу за 10 хв`,
+  "owner.attention": () => "Потрібна ваша увага: автоматично розбудити виконавця не вийшло",
   "cmo_sync.failed": (e) => `Не вдалося передати в CMO Space: ${String(e.payload.error ?? "")} — QA-агент повідомить`,
   "run.cancelled": () => "Запуск скасовано",
   "run.budget_exceeded": () => "Зупинено: вичерпано бюджет",

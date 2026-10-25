@@ -243,3 +243,59 @@ export async function revokeExecutorAction(form: FormData): Promise<void> {
   await asUser(db(), user.id, (tx) => tx`select office.revoke_executor(${id}::uuid)`);
   revalidatePath("/w", "layout");
 }
+
+// ---------------------------------------------------------------------------
+// Router + Trigger Gateway (owner only; every function re-checks the role in the database)
+// ---------------------------------------------------------------------------
+const PROVIDERS = ["anthropic", "openai"] as const;
+
+/** Owner marks a provider's limit as exhausted until a time: work moves to a verified fallback. */
+export async function setProviderLimitAction(form: FormData): Promise<void> {
+  const user = await requireUser();
+  const ws = z.string().uuid().parse(form.get("workspace_id"));
+  const provider = z.enum(PROVIDERS).parse(form.get("provider"));
+  const hours = z.coerce.number().int().min(1).max(168).parse(form.get("hours"));
+  const until = new Date(Date.now() + hours * 3_600_000).toISOString();
+  await asUser(db(), user.id, (tx) => tx`select office.set_provider_limit(${ws}::uuid, ${provider}, ${until}::timestamptz, 'owner')`);
+  revalidatePath("/w", "layout");
+}
+
+export async function clearProviderLimitAction(form: FormData): Promise<void> {
+  const user = await requireUser();
+  const ws = z.string().uuid().parse(form.get("workspace_id"));
+  const provider = z.enum(PROVIDERS).parse(form.get("provider"));
+  await asUser(db(), user.id, (tx) => tx`select office.clear_provider_limit(${ws}::uuid, ${provider})`);
+  revalidatePath("/w", "layout");
+}
+
+export async function setChannelEnabledAction(form: FormData): Promise<void> {
+  const user = await requireUser();
+  const id = z.string().uuid().parse(form.get("channel_id"));
+  const enabled = form.get("enabled") === "true";
+  await asUser(db(), user.id, (tx) => tx`select office.set_channel_enabled(${id}::uuid, ${enabled})`);
+  revalidatePath("/w", "layout");
+}
+
+export async function resumeChannelAction(form: FormData): Promise<void> {
+  const user = await requireUser();
+  const id = z.string().uuid().parse(form.get("channel_id"));
+  await asUser(db(), user.id, (tx) => tx`select office.resume_channel(${id}::uuid)`);
+  revalidatePath("/w", "layout");
+}
+
+/** Only verified executors may receive fallback work (owner decision 19.10). */
+export async function setExecutorVerifiedAction(form: FormData): Promise<void> {
+  const user = await requireUser();
+  const id = z.string().uuid().parse(form.get("executor_id"));
+  const verified = form.get("verified") === "true";
+  await asUser(db(), user.id, (tx) => tx`select office.set_executor_verified(${id}::uuid, ${verified}, 'owner')`);
+  revalidatePath("/w", "layout");
+}
+
+export async function setTriggersEnabledAction(form: FormData): Promise<void> {
+  const user = await requireUser();
+  const ws = z.string().uuid().parse(form.get("workspace_id"));
+  const enabled = form.get("enabled") === "true";
+  await asUser(db(), user.id, (tx) => tx`select office.set_triggers_enabled(${ws}::uuid, ${enabled})`);
+  revalidatePath("/w", "layout");
+}
