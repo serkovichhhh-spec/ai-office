@@ -172,7 +172,14 @@ export async function runTool(ctx: McpContext, name: string, rawArgs: unknown) {
         return toolResult(r);
       }
       case "office_submit_result": {
-        const a = z.object({ task_id: TaskId, ...LeaseArgs, result: z.record(z.string(), z.unknown()) }).parse(args);
+        // Lenient on attempt_id / lease_token: agents sometimes alter them; the database falls back to the
+        // executor's own active lease on this task and journals it.
+        const a = z.object({
+          task_id: TaskId,
+          attempt_id: z.string().max(200).optional().transform((v) => (v && /^[0-9a-f-]{36}$/i.test(v) ? v : null)),
+          lease_token: z.string().max(400).optional().transform((v) => v ?? null),
+          result: z.record(z.string(), z.unknown()),
+        }).parse(args);
         const env = (await call(ctx.sql, "gateway_get", [ctx.tokenHash, a.task_id])) as Json;
         const schema = OUTPUT_SCHEMAS[String(env.output_schema_name ?? "")];
         if (schema) {
@@ -189,7 +196,8 @@ export async function runTool(ctx: McpContext, name: string, rawArgs: unknown) {
             );
           }
         }
-        return toolResult((await call(ctx.sql, "gateway_submit", [ctx.tokenHash, a.attempt_id, a.lease_token, ctx.sql.json(a.result as never)])) as Json);
+        // gateway_submit_step: exact attempt+lease, else this executor's own active lease on the task (journaled).
+        return toolResult((await call(ctx.sql, "gateway_submit_step", [ctx.tokenHash, a.task_id, a.attempt_id, a.lease_token, ctx.sql.json(a.result as never)])) as Json);
       }
       case "office_get_team_status":
         return toolResult((await call(ctx.sql, "gateway_status", [ctx.tokenHash])) as Json);
