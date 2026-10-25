@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { channelConfigured, classify, fire, requiredEnv, type DispatchItem } from "@/lib/triggers/adapters";
+import { channelConfigured, classify, fire, requiredEnv, triggerIdFrom, type DispatchItem } from "@/lib/triggers/adapters";
 
 const item = (adapter: DispatchItem["adapter"], env_prefix = "CLAUDE_ROUTINE"): DispatchItem => ({
   trigger_run_id: "11111111-1111-4111-8111-111111111111",
@@ -91,5 +91,17 @@ describe("trigger adapters", () => {
     expect(requiredEnv("manual_notify", {})).toEqual([]);
     expect(channelConfigured("claude_routine", { env_prefix: "CLAUDE_ROUTINE" }, claudeEnv)).toBe(true);
     expect(channelConfigured("claude_routine", { env_prefix: "bad prefix" }, claudeEnv)).toBe(false);
+  });
+
+  it("ChatGPT trigger id: bare id, pasted URL or padded value all work; others are refused with a safe hint", async () => {
+    expect(triggerIdFrom("agtch_123")).toBe("agtch_123");
+    expect(triggerIdFrom(" https://api.chatgpt.com/v1/workspace_agents/agtch_A-b_9/trigger\n")).toBe("agtch_A-b_9");
+    expect(triggerIdFrom('"agtch_x"')).toBe("agtch_x");
+    expect(triggerIdFrom("agt_123")).toBeNull();
+    const { f, calls } = fakeFetch(202, {});
+    await fire(item("chatgpt_agent", "CHATGPT_AGENT"), { fetch: f, env: { ...gptEnv, CHATGPT_AGENT_TRIGGER_ID: "https://api.chatgpt.com/v1/workspace_agents/agtch_123/trigger" } });
+    expect(calls[0].url).toBe("https://api.chatgpt.com/v1/workspace_agents/agtch_123/trigger");
+    const bad = await fire(item("chatgpt_agent", "CHATGPT_AGENT"), { fetch: f, env: { ...gptEnv, CHATGPT_AGENT_TRIGGER_ID: "g-abcdef123" } });
+    expect(bad).toMatchObject({ result: "fatal", message: expect.stringContaining('"g-abcd"') });
   });
 });

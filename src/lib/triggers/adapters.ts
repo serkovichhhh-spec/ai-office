@@ -93,12 +93,18 @@ async function fireClaude(item: DispatchItem, deps: AdapterDeps, prefix: string)
   return classify(res.status, res.headers.get("retry-after"), await errorMessage(res));
 }
 
+/** Accepts the bare id or a pasted URL / value with spaces or quotes; returns agtch_… or null. */
+export function triggerIdFrom(raw: string): string | null {
+  return raw.match(/agtch_[A-Za-z0-9_-]+/)?.[0] ?? null;
+}
+
 /** ChatGPT workspace agent: POST api.chatgpt.com/v1/workspace_agents/{agtch_…}/trigger (beta run id). */
 async function fireChatGpt(item: DispatchItem, deps: AdapterDeps, prefix: string): Promise<FireOutcome> {
-  const id = deps.env[`${prefix}_TRIGGER_ID`];
-  const token = deps.env[`${prefix}_TOKEN`];
-  if (!id || !token) return { result: "not_configured" };
-  if (!/^agtch_[A-Za-z0-9_-]+$/.test(id)) return { result: "fatal", message: "trigger id must look like agtch_…" };
+  const raw = deps.env[`${prefix}_TRIGGER_ID`];
+  const token = deps.env[`${prefix}_TOKEN`]?.trim();
+  if (!raw || !token) return { result: "not_configured" };
+  const id = triggerIdFrom(raw);
+  if (!id) return { result: "fatal", message: `trigger id must contain agtch_… (value starts with "${raw.trim().slice(0, 6)}")` };
   const res = await post(deps, `https://api.chatgpt.com/v1/workspace_agents/${id}/trigger`, {
     authorization: `Bearer ${token}`,
     "openai-beta": "workspace_agent_runs=v1",
