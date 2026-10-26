@@ -1,0 +1,45 @@
+Бібліотека бренд-ассетів ПАВУТИНИ. Використовуй ЛИШЕ ці файли; в asset_uses вказуй asset_id і version точно як тут.
+Права: Власні ассети ПАВУТИНИ; використання в рекламі й комунікаціях ПАВУТИНИ затверджене власником бренду.
+Оригінали (PSD/PDF/RAR) — Google Drive власника, папка pavutyna_design.
+
+- asset_id=pavutyna.mascot version=9dd900e7558b · Маскот-павук, прозорий фон · 883×464 · https://ai-office-red.vercel.app/brand/pavutyna/assets/spider.png
+  Як використовувати: Головний герой. Тільки цей файл: не перемальовувати, не змінювати кольори, око-шестикутник, 8 лап, пропорції. Можна: масштаб, дзеркало по горизонталі, обрізання краєм кадру, тінь, відображення, кольорова підсвітка.
+- asset_id=pavutyna.logo.white version=790202cdc95d · Лого біле з підписом «— телеком-оператор» · 810×242 · https://ai-office-red.vercel.app/brand/pavutyna/assets/logo-white-stacked.png
+  Як використовувати: Основне лого на темних макетах. Ширина ≈26–30% полотна, відступ від краю ≥80 px на 1080. Тільки картинкою, не набирати шрифтом.
+- asset_id=pavutyna.logo.white.horizontal version=73aeff6355bb · Лого біле в рядок · 971×123 · https://ai-office-red.vercel.app/brand/pavutyna/assets/logo-white-horizontal.png
+  Як використовувати: Вузькі банери, футер.
+- asset_id=pavutyna.lockup.white version=f7f63fa89693 · Павук + біле лого · 713×586 · https://ai-office-red.vercel.app/brand/pavutyna/assets/spider-logo-white.png
+  Як використовувати: Темні фони, аватар, заставки.
+- asset_id=pavutyna.lockup.dark version=4a4b16b0f2a6 · Павук + темне лого · 713×586 · https://ai-office-red.vercel.app/brand/pavutyna/assets/spider-logo-dark.png
+  Як використовувати: Світлі фони, документи.
+- asset_id=pavutyna.element.web version=36f1f3d66903 · Світна павутина (синя/червона) · 923×1184 · https://ai-office-red.vercel.app/brand/pavutyna/assets/web-glow.png
+  Як використовувати: Фоновий декор, накладати screen/lighten.
+- asset_id=pavutyna.icons version=276a013a6560 · Лінійні іконки й кнопки-стрілки · 934×1275 · https://ai-office-red.vercel.app/brand/pavutyna/assets/icons-sheet.png
+  Як використовувати: Вирізати потрібну; червоні/сині лінійні.
+- asset_id=pavutyna.glow.blue version=1c1559078b80 · Синє світіння · 1008×1008 · https://ai-office-red.vercel.app/brand/pavutyna/assets/blur-blue.png
+  Як використовувати: Підсвітка за об'єктами й текстом.
+- asset_id=pavutyna.glow.red version=bdc0d5de0741 · Червоне світіння · 1036×1035 · https://ai-office-red.vercel.app/brand/pavutyna/assets/blur-red.png
+  Як використовувати: Підсвітка за об'єктами й текстом.
+- asset_id=pavutyna.ref.post-plan-b version=49c34dd01c76 · Еталон: пост «План Б» 1080×1440 · 1080×1440 · https://ai-office-red.vercel.app/brand/pavutyna/refs/post-plan-b.jpg
+  Як використовувати: Еталон стилю, не копіювати тексти й ціни.
+- asset_id=pavutyna.ref.post-new-addresses version=86ff0335e337 · Еталон: пост «Нові адреси» · 1080×1440 · https://ai-office-red.vercel.app/brand/pavutyna/refs/post-new-addresses.jpg
+  Як використовувати: Еталон стилю.
+- asset_id=pavutyna.ref.post-mega-optika version=a44869c8b1e9 · Еталон: пост MEGA ОПТИКА · 952×1440 · https://ai-office-red.vercel.app/brand/pavutyna/refs/post-mega-optika.jpg
+  Як використовувати: Еталон стилю.
+- asset_id=pavutyna.ref.square-gpon-hata version=f7148e25a8a6 · Еталон: квадрат GPON ХАТА · 1080×1080 · https://ai-office-red.vercel.app/brand/pavutyna/refs/square-gpon-hata.jpg
+  Як використовувати: Еталон стилю.
+- asset_id=pavutyna.ref.square-xgs-10g version=ac5a7ef96bc1 · Еталон: квадрат XGS-GPON 10G · 480×480 · https://ai-office-red.vercel.app/brand/pavutyna/refs/square-xgs-10g.jpg
+  Як використовувати: Еталон стилю.
+- asset_id=pavutyna.ref.square-warning version=eb5bb8736f9d · Еталон: «Увага, роботи на мережі» · 1080×1080 · https://ai-office-red.vercel.app/brand/pavutyna/refs/square-warning.jpg
+  Як використовувати: Еталон стилю.
+- asset_id=pavutyna.ref.story-works version=66ffe514dac1 · Еталон: сторіз · 810×1440 · https://ai-office-red.vercel.app/brand/pavutyna/refs/story-works.jpg
+  Як використовувати: Еталон стилю.
+- asset_id=pavutyna.ref.banner-gigabit version=09891f02fa2e · Еталон: вузький банер «Незламний гігабіт» · 1080×334 · https://ai-office-red.vercel.app/brand/pavutyna/refs/banner-gigabit.jpg
+  Як використовувати: Еталон стилю.
+- asset_id=pavutyna.ref.a4 version=2831a2a4988f · Еталон: А4 / флаєр · 1024×1440 · https://ai-office-red.vercel.app/brand/pavutyna/refs/a4-switch-50.jpg
+  Як використовувати: Еталон стилю для друку.
+- asset_id=pavutyna.ref.rollup version=105befecec8f · Еталон: ролап · 600×1440 · https://ai-office-red.vercel.app/brand/pavutyna/refs/rollup-inet.jpg
+  Як використовувати: Еталон стилю.
+
+Шрифти: бренд — Geometria (файлів немає); заміна — Montserrat Italic 500/800/900, файли https://ai-office-red.vercel.app/brand/pavutyna/fonts/ (cyrillic і latin для кожної ваги).
+Повний перелік у JSON: https://ai-office-red.vercel.app/brand/pavutyna/manifest.json

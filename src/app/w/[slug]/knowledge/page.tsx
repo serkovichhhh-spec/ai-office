@@ -5,6 +5,7 @@ import { when } from "../../../components/ui";
 import { setKnowledgeClassAction, setKnowledgeStatusAction } from "../../../actions";
 import { KnowledgeForm } from "./KnowledgeForm";
 import { ResearchCandidates } from "./ResearchCandidates";
+import { BrandLibrary } from "./BrandLibrary";
 
 export const dynamic = "force-dynamic";
 
@@ -25,6 +26,7 @@ export default async function KnowledgePage({ params }: { params: Promise<{ slug
   const drafts = docs.filter((d) => d.status !== "approved").length;
   return (
     <div className="cols" style={{ marginTop: 0 }}>
+      {slug === "pavutyna" && <BrandLibrary />}
       <section className="panel" aria-labelledby="k-title">
         <div className="panel-head">
           <h2 id="k-title">Знання {ws.name}</h2>
