@@ -6,7 +6,7 @@ import { SectionView } from "./SectionView";
 /** Schematic layout preview at the real aspect ratio. Not a final design: no generated images yet. */
 function Mockup({ f, c }: { f: FormatView; c?: CopyView }) {
   const tall = f.h / f.w > 1.4;
-  const box = f.w >= f.h ? { width: 188 } : { height: 228, width: Math.round((228 * f.w) / f.h) };
+  const box = f.w >= f.h ? { width: 160 } : { height: 200, width: Math.round((200 * f.w) / f.h) };
   return (
     <figure className="mock-wrap">
       <div className={`mock${tall ? " tall" : ""}`} style={{ ...box, aspectRatio: `${f.w} / ${f.h}` }} aria-label={`Схема макета ${f.ratio}`}>

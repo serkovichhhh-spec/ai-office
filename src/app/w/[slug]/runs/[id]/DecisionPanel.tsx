@@ -1,10 +1,23 @@
 "use client";
-import { useActionState, useState } from "react";
+import { useActionState, useEffect, useState } from "react";
 import { decideAction, type ActionState } from "../../../../actions";
 
 export function DecisionPanel({ artifactId, version, canApprove = true, template }: { artifactId: string; version: number; canApprove?: boolean; template?: string }) {
   const [state, action, pending] = useActionState<ActionState, FormData>(decideAction, {});
   const [comment, setComment] = useState("");
+  useEffect(() => {
+    const add = (e: Event) => {
+      const line = String((e as CustomEvent<string>).detail ?? "");
+      const area = line.split(":")[0];
+      setComment((c) => {
+        // One answer per topic: a new choice replaces the previous line of the same topic.
+        const lines = c.split("\n").filter((l) => l.trim() && !l.replace(/^\d+\.\s*/, "").startsWith(area + ":"));
+        return [...lines, line].map((l, i) => `${i + 1}. ${l.replace(/^\d+\.\s*/, "")}`).join("\n");
+      });
+    };
+    window.addEventListener("office:answer", add);
+    return () => window.removeEventListener("office:answer", add);
+  }, []);
   return (
     <section className="panel decision" aria-labelledby={`decide-${artifactId}`}>
       <h2 id={`decide-${artifactId}`} style={{ marginBottom: 6 }}>Твоє рішення <span className="muted small">версія {version}</span></h2>
@@ -16,12 +29,12 @@ export function DecisionPanel({ artifactId, version, canApprove = true, template
       <form action={action}>
         <input type="hidden" name="artifact_id" value={artifactId} />
         <label style={{ marginTop: 12 }}>
-          Коментар {!canApprove && <span className="hint">відповіді на пункти зліва</span>}
+          Коментар
           <textarea name="rationale" value={comment} onChange={(e) => setComment(e.target.value)} maxLength={4000}
-            placeholder={canApprove ? "Необовʼязково для затвердження" : "1. … 2. …"} />
+            placeholder={canApprove ? "Необовʼязково для затвердження" : "Натисни відповіді зліва або напиши своє"} />
         </label>
         {template && !comment && (
-          <button type="button" className="btn link small" onClick={() => setComment(template)}>Вставити шаблон відповідей</button>
+          <button type="button" className="btn link small" onClick={() => setComment(template)}>Заповнити відповідями за замовчуванням</button>
         )}
         {state.error && <p className="error" role="alert" style={{ marginTop: 8 }}>{state.error}</p>}
         <div className="actions">

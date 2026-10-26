@@ -331,3 +331,19 @@ details.panel.tech { margin-top: 24px; } details.panel.tech > summary { color: v
 .brand-img img { max-width: 100%; max-height: 100%; object-fit: contain; }
 .brand-img.photo { padding: 0; overflow: hidden; } .brand-img.photo img { width: 100%; height: 100%; object-fit: cover; }
 .brand-tile figcaption { font-size: 12px; display: grid; gap: 2px; } .brand-tile code { color: var(--muted); font-size: 11px; }
+
+/* 1.4.1 polish */
+.panel > details.quiet:first-child { border-top: 0; margin-top: 0; padding-top: 0; }
+.todo-title { display: block; font-size: 14px; }
+.todo p.muted { margin: 2px 0 0; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.chip { border: 1px solid var(--line); background: var(--desk); color: var(--ink); border-radius: 999px; padding: 4px 10px; font-size: 12.5px; line-height: 1.3; cursor: pointer; text-align: left; max-width: 100%; }
+.chip:hover { border-color: var(--web); }
+.chip:first-child { border-color: var(--ok); }
+.mock-row { flex-wrap: wrap; overflow-x: visible; }
+details.lead-more > summary { list-style: none; cursor: pointer; font-weight: 400; }
+details.lead-more > summary::-webkit-details-marker { display: none; }
+details.lead-more .more { color: var(--web); font-size: 14px; font-weight: 600; white-space: nowrap; }
+details.lead-more[open] .more { display: none; }
+details.quiet-panel > summary { color: var(--muted); font-weight: 600; font-size: 14px; }
+details.quiet-panel .panel { border: 0; box-shadow: none; padding: 0; margin-top: 10px; background: transparent; }

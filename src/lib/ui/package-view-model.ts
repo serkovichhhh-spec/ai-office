@@ -73,11 +73,42 @@ export function creativesFrom(content: unknown): CreativeView[] | null {
   return out.length ? out : null;
 }
 
-export interface OwnerItem { severity: "critical" | "major" | "minor" | "question"; area: string; text: string }
+export type Severity = "critical" | "major" | "minor" | "question";
+export interface OwnerItem {
+  severity: Severity;
+  /** Short topic title («Трекінг-коди»), or the reviewer criterion for items without a topic. */
+  area: string;
+  /** One short line: what is missing. */
+  text: string;
+  /** Proposed answers, the first is the default used by the template. */
+  answers: string[];
+  /** How many raw questions/issues were merged into this item. */
+  merged: number;
+}
 
 const CRITERION: Record<string, string> = {
   evidence: "Доказовість", brief_fit: "Відповідність брифу", brand: "Бренд", execution: "Виконуваність", specialist: "Фахова якість",
 };
+
+/** Recurring owner topics with ready answers. Order matters: the first match wins. */
+export const TOPICS: { key: string; title: string; match: RegExp; answers: string[] }[] = [
+  { key: "specs", title: "Специфікації форматів", match: /специфікац|pinned|safe.?area|офіційн\S* вимог/i,
+    answers: ["Бери затверджені знання «Специфікації форматів Meta» і «Google Ads і TikTok». Для Telegram офіційних вимог немає — адаптуй із 9:16."] },
+  { key: "assets", title: "Лого й маскот", match: /лого|маскот|asset/i,
+    answers: ["Файли є в знанні «Бібліотека бренд-ассетів ПАВУТИНИ»: pavutyna.logo.white і pavutyna.mascot з їхніми версіями. Права підтверджую."] },
+  { key: "tracking", title: "Трекінг-коди", match: /трекінг|l\.pavutyna|\bкод/i,
+    answers: ["Залиш l.pavutyna.com/s/<код> як заглушку — коди проставимо при запуску. Не блокер.", "Коди: "] },
+  { key: "promo", title: "Чинність акцій", match: /чинн|діють|актуальн|флайт|промо/i,
+    answers: ["Акції чинні за знанням «Тарифи й акції (жовтень–грудень 2026)». Фінальна перевірка — перед запуском, не блокер.", "Акцію «…» не використовувати."] },
+  { key: "legal", title: "Юридичний текст", match: /юрид|юрист|юрблок|кегль|умов/i,
+    answers: ["На креативі коротка виноска «*Умови акції — на pavutyna.ua», повні умови — на посадковій сторінці.", "Повні умови на креативі, мінімальний кегль — "] },
+  { key: "geo", title: "Гео", match: /гео|таргетинг|київ/i, answers: ["Київ і Київська область, лише адреси в зоні покриття."] },
+  { key: "video", title: "Відео", match: /відео|покадров|reels|shorts|tiktok/i,
+    answers: ["Зараз тільки статика. Відео — окремим брифом.", "Потрібні й відео: "] },
+  { key: "placements", title: "Плейсменти", match: /плейсмент|площин|telegram|google|youtube|gdn|responsive|формат\S* поставки/i,
+    answers: ["Meta: стрічка 1:1 і 4:5, Stories/Reels 9:16. Telegram, Google і YouTube — не в цьому пакеті.", "Meta + Google адаптивні медійні (1200×628 і 1200×1200, без тексту на фото)."] },
+];
+const GENERIC = ["Вирішуй сам за брифом і знаннями — не блокуй.", "Прибери це з матеріалу."];
 
 interface PkgLike {
   outcome?: string;
@@ -86,18 +117,39 @@ interface PkgLike {
   unsupported_claims?: unknown[];
 }
 
-/** What the owner has to answer or provide, most severe first. Raw JSON fragments of the reviewer are not shown. */
+/** «[Відповідальний: …; строк: …] Надайте…» → «Надайте…»; first sentence, ≤ 160 chars. */
+export function shortText(t: string): string {
+  const clean = t.replace(/^\s*\[[^\]]*\]\s*/, "").replace(/\s+/g, " ").trim();
+  const first = clean.split(/(?<=[.!?])\s/)[0];
+  return first.length > 160 ? first.slice(0, 157).replace(/\s+\S*$/, "") + "…" : first;
+}
+
+const RANK: Record<Severity, number> = { critical: 0, question: 1, major: 2, minor: 3 };
+
+/** What the owner has to answer, merged into topics with ready answers, most severe first. */
 export function ownerChecklist(pkg: PkgLike): OwnerItem[] {
-  const items: OwnerItem[] = [];
-  for (const q of pkg.blocking_questions ?? []) if (str(q)) items.push({ severity: "question", area: "Питання", text: String(q) });
+  const raw: { severity: Severity; area: string; text: string }[] = [];
+  for (const q of pkg.blocking_questions ?? []) if (str(q)) raw.push({ severity: "question", area: "Питання", text: String(q) });
   for (const x of pkg.review?.open_issues ?? []) {
     const text = str(x.fix) ?? str(x.problem);
     if (!text) continue;
-    const sev = x.severity === "critical" ? "critical" : x.severity === "major" ? "major" : "minor";
-    items.push({ severity: sev, area: CRITERION[String(x.criterion)] ?? String(x.criterion ?? "Зауваження"), text });
+    raw.push({ severity: x.severity === "critical" ? "critical" : x.severity === "major" ? "major" : "minor",
+      area: CRITERION[String(x.criterion)] ?? String(x.criterion ?? "Зауваження"), text });
   }
-  const order = { critical: 0, question: 1, major: 2, minor: 3 } as const;
-  return items.sort((a, b) => order[a.severity] - order[b.severity]);
+  const byTopic = new Map<string, OwnerItem>();
+  const loose: OwnerItem[] = [];
+  for (const r of raw) {
+    const topic = TOPICS.find((t) => t.match.test(r.text));
+    if (!topic) { loose.push({ severity: r.severity, area: r.area, text: shortText(r.text), answers: GENERIC, merged: 1 }); continue; }
+    const prev = byTopic.get(topic.key);
+    if (!prev) byTopic.set(topic.key, { severity: r.severity, area: topic.title, text: shortText(r.text), answers: topic.answers, merged: 1 });
+    else {
+      prev.merged++;
+      if (RANK[r.severity] < RANK[prev.severity]) { prev.severity = r.severity; prev.text = shortText(r.text); }
+    }
+  }
+  const order = TOPICS.map((t) => t.title);
+  return [...byTopic.values(), ...loose].sort((a, b) => RANK[a.severity] - RANK[b.severity] || order.indexOf(a.area) - order.indexOf(b.area));
 }
 
 /** Excluded claims: removed from the copy until the owner confirms them. */
@@ -105,9 +157,9 @@ export function excludedClaims(pkg: PkgLike): string[] {
   return (pkg.unsupported_claims ?? []).map((c) => String(c).replace(/\s*\(прибрано з матеріалу\)\s*$/i, "")).filter(Boolean);
 }
 
-/** A ready-to-edit answer template for «Доопрацювати». */
+/** «Доопрацювати» comment prefilled with the default answers — the owner only edits what is different. */
 export function answerTemplate(items: OwnerItem[]): string {
-  return items.map((x, i) => `${i + 1}. ${x.area}: ${x.text.split(/(?<=[.!?])\s/)[0]}\n   Відповідь: `).join("\n");
+  return items.map((x, i) => `${i + 1}. ${x.area}: ${x.answers[0]}`).join("\n");
 }
 
 export type OwnerState =
