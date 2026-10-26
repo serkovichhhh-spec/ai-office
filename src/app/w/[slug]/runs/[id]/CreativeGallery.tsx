@@ -12,14 +12,16 @@ function Mockup({ f, c }: { f: FormatView; c?: CopyView }) {
       <div className={`mock${tall ? " tall" : ""}`} style={{ ...box, aspectRatio: `${f.w} / ${f.h}` }} aria-label={`Схема макета ${f.ratio}`}>
         {tall && <div className="mock-safe" aria-hidden="true" />}
         <div className="mock-in">
-        <div className="mock-brand" aria-hidden="true"><span className="mock-dot" />PAVUTYNA</div>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img className="mock-logo" src="/brand/pavutyna/assets/logo-white-stacked.png" alt="" aria-hidden="true" />
         <div className="mock-text">
           <b>{c?.headline ?? "Заголовок"}</b>
           {c?.body && <span>{c.body}</span>}
         </div>
         <div className="mock-foot">
           {c?.cta ? <div className="mock-cta">{c.cta}</div> : <span />}
-          <div className="mock-mascot" aria-hidden="true">маскот</div>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img className="mock-mascot" src="/brand/pavutyna/assets/spider.png" alt="" aria-hidden="true" />
         </div>
         {f.isVideo && <div className="mock-play" aria-hidden="true">▶</div>}
         </div>
@@ -79,7 +81,7 @@ export function CreativeGallery({ items }: { items: CreativeView[] }) {
   return (
     <div className="gallery">
       {items.map((cr, i) => <Creative key={cr.key} cr={cr} n={i + 1} />)}
-      <p className="small muted">Це схеми розкладки в реальних пропорціях, а не фінальний дизайн. Готові зображення зʼявляться, коли підключимо генерацію картинок.</p>
+      <p className="small muted">Схема розкладки в реальних пропорціях з оригінальними лого й маскотом — не фінальний дизайн: фон, світло й верстку робить дизайнер або генерація.</p>
     </div>
   );
 }

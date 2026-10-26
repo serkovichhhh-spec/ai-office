@@ -1,0 +1,221 @@
+{
+  "brand": "pavutyna",
+  "rights": "Власні ассети ПАВУТИНИ; використання в рекламі й комунікаціях ПАВУТИНИ затверджене власником бренду.",
+  "drive_originals": "https://drive.google.com/drive/folders/1TiRHgN09i1vk6FH0eWjCUWcH14WmLeSz",
+  "fonts": {
+    "substitute": "Montserrat Italic (500/800/900)",
+    "brand_font": "Geometria (файлів немає)",
+    "files": "https://ai-office-red.vercel.app/brand/pavutyna/fonts/montserrat-{cyrillic,latin}-{500,800,900}-italic.woff2"
+  },
+  "assets": [
+    {
+      "id": "pavutyna.mascot",
+      "version": "9dd900e7558b",
+      "title": "Маскот-павук, прозорий фон",
+      "usage": "Головний герой. Тільки цей файл: не перемальовувати, не змінювати кольори, око-шестикутник, 8 лап, пропорції. Можна: масштаб, дзеркало по горизонталі, обрізання краєм кадру, тінь, відображення, кольорова підсвітка.",
+      "kind": "asset",
+      "file": "assets/spider.png",
+      "url": "https://ai-office-red.vercel.app/brand/pavutyna/assets/spider.png",
+      "width": 883,
+      "height": 464
+    },
+    {
+      "id": "pavutyna.logo.white",
+      "version": "790202cdc95d",
+      "title": "Лого біле з підписом «— телеком-оператор»",
+      "usage": "Основне лого на темних макетах. Ширина ≈26–30% полотна, відступ від краю ≥80 px на 1080. Тільки картинкою, не набирати шрифтом.",
+      "kind": "asset",
+      "file": "assets/logo-white-stacked.png",
+      "url": "https://ai-office-red.vercel.app/brand/pavutyna/assets/logo-white-stacked.png",
+      "width": 810,
+      "height": 242
+    },
+    {
+      "id": "pavutyna.logo.white.horizontal",
+      "version": "73aeff6355bb",
+      "title": "Лого біле в рядок",
+      "usage": "Вузькі банери, футер.",
+      "kind": "asset",
+      "file": "assets/logo-white-horizontal.png",
+      "url": "https://ai-office-red.vercel.app/brand/pavutyna/assets/logo-white-horizontal.png",
+      "width": 971,
+      "height": 123
+    },
+    {
+      "id": "pavutyna.lockup.white",
+      "version": "f7f63fa89693",
+      "title": "Павук + біле лого",
+      "usage": "Темні фони, аватар, заставки.",
+      "kind": "asset",
+      "file": "assets/spider-logo-white.png",
+      "url": "https://ai-office-red.vercel.app/brand/pavutyna/assets/spider-logo-white.png",
+      "width": 713,
+      "height": 586
+    },
+    {
+      "id": "pavutyna.lockup.dark",
+      "version": "4a4b16b0f2a6",
+      "title": "Павук + темне лого",
+      "usage": "Світлі фони, документи.",
+      "kind": "asset",
+      "file": "assets/spider-logo-dark.png",
+      "url": "https://ai-office-red.vercel.app/brand/pavutyna/assets/spider-logo-dark.png",
+      "width": 713,
+      "height": 586
+    },
+    {
+      "id": "pavutyna.element.web",
+      "version": "36f1f3d66903",
+      "title": "Світна павутина (синя/червона)",
+      "usage": "Фоновий декор, накладати screen/lighten.",
+      "kind": "asset",
+      "file": "assets/web-glow.png",
+      "url": "https://ai-office-red.vercel.app/brand/pavutyna/assets/web-glow.png",
+      "width": 923,
+      "height": 1184
+    },
+    {
+      "id": "pavutyna.icons",
+      "version": "276a013a6560",
+      "title": "Лінійні іконки й кнопки-стрілки",
+      "usage": "Вирізати потрібну; червоні/сині лінійні.",
+      "kind": "asset",
+      "file": "assets/icons-sheet.png",
+      "url": "https://ai-office-red.vercel.app/brand/pavutyna/assets/icons-sheet.png",
+      "width": 934,
+      "height": 1275
+    },
+    {
+      "id": "pavutyna.glow.blue",
+      "version": "1c1559078b80",
+      "title": "Синє світіння",
+      "usage": "Підсвітка за об'єктами й текстом.",
+      "kind": "asset",
+      "file": "assets/blur-blue.png",
+      "url": "https://ai-office-red.vercel.app/brand/pavutyna/assets/blur-blue.png",
+      "width": 1008,
+      "height": 1008
+    },
+    {
+      "id": "pavutyna.glow.red",
+      "version": "bdc0d5de0741",
+      "title": "Червоне світіння",
+      "usage": "Підсвітка за об'єктами й текстом.",
+      "kind": "asset",
+      "file": "assets/blur-red.png",
+      "url": "https://ai-office-red.vercel.app/brand/pavutyna/assets/blur-red.png",
+      "width": 1036,
+      "height": 1035
+    },
+    {
+      "id": "pavutyna.ref.post-plan-b",
+      "version": "49c34dd01c76",
+      "title": "Еталон: пост «План Б» 1080×1440",
+      "usage": "Еталон стилю, не копіювати тексти й ціни.",
+      "kind": "ref",
+      "file": "refs/post-plan-b.jpg",
+      "url": "https://ai-office-red.vercel.app/brand/pavutyna/refs/post-plan-b.jpg",
+      "width": 1080,
+      "height": 1440
+    },
+    {
+      "id": "pavutyna.ref.post-new-addresses",
+      "version": "86ff0335e337",
+      "title": "Еталон: пост «Нові адреси»",
+      "usage": "Еталон стилю.",
+      "kind": "ref",
+      "file": "refs/post-new-addresses.jpg",
+      "url": "https://ai-office-red.vercel.app/brand/pavutyna/refs/post-new-addresses.jpg",
+      "width": 1080,
+      "height": 1440
+    },
+    {
+      "id": "pavutyna.ref.post-mega-optika",
+      "version": "a44869c8b1e9",
+      "title": "Еталон: пост MEGA ОПТИКА",
+      "usage": "Еталон стилю.",
+      "kind": "ref",
+      "file": "refs/post-mega-optika.jpg",
+      "url": "https://ai-office-red.vercel.app/brand/pavutyna/refs/post-mega-optika.jpg",
+      "width": 952,
+      "height": 1440
+    },
+    {
+      "id": "pavutyna.ref.square-gpon-hata",
+      "version": "f7148e25a8a6",
+      "title": "Еталон: квадрат GPON ХАТА",
+      "usage": "Еталон стилю.",
+      "kind": "ref",
+      "file": "refs/square-gpon-hata.jpg",
+      "url": "https://ai-office-red.vercel.app/brand/pavutyna/refs/square-gpon-hata.jpg",
+      "width": 1080,
+      "height": 1080
+    },
+    {
+      "id": "pavutyna.ref.square-xgs-10g",
+      "version": "ac5a7ef96bc1",
+      "title": "Еталон: квадрат XGS-GPON 10G",
+      "usage": "Еталон стилю.",
+      "kind": "ref",
+      "file": "refs/square-xgs-10g.jpg",
+      "url": "https://ai-office-red.vercel.app/brand/pavutyna/refs/square-xgs-10g.jpg",
+      "width": 480,
+      "height": 480
+    },
+    {
+      "id": "pavutyna.ref.square-warning",
+      "version": "eb5bb8736f9d",
+      "title": "Еталон: «Увага, роботи на мережі»",
+      "usage": "Еталон стилю.",
+      "kind": "ref",
+      "file": "refs/square-warning.jpg",
+      "url": "https://ai-office-red.vercel.app/brand/pavutyna/refs/square-warning.jpg",
+      "width": 1080,
+      "height": 1080
+    },
+    {
+      "id": "pavutyna.ref.story-works",
+      "version": "66ffe514dac1",
+      "title": "Еталон: сторіз",
+      "usage": "Еталон стилю.",
+      "kind": "ref",
+      "file": "refs/story-works.jpg",
+      "url": "https://ai-office-red.vercel.app/brand/pavutyna/refs/story-works.jpg",
+      "width": 810,
+      "height": 1440
+    },
+    {
+      "id": "pavutyna.ref.banner-gigabit",
+      "version": "09891f02fa2e",
+      "title": "Еталон: вузький банер «Незламний гігабіт»",
+      "usage": "Еталон стилю.",
+      "kind": "ref",
+      "file": "refs/banner-gigabit.jpg",
+      "url": "https://ai-office-red.vercel.app/brand/pavutyna/refs/banner-gigabit.jpg",
+      "width": 1080,
+      "height": 334
+    },
+    {
+      "id": "pavutyna.ref.a4",
+      "version": "2831a2a4988f",
+      "title": "Еталон: А4 / флаєр",
+      "usage": "Еталон стилю для друку.",
+      "kind": "ref",
+      "file": "refs/a4-switch-50.jpg",
+      "url": "https://ai-office-red.vercel.app/brand/pavutyna/refs/a4-switch-50.jpg",
+      "width": 1024,
+      "height": 1440
+    },
+    {
+      "id": "pavutyna.ref.rollup",
+      "version": "105befecec8f",
+      "title": "Еталон: ролап",
+      "usage": "Еталон стилю.",
+      "kind": "ref",
+      "file": "refs/rollup-inet.jpg",
+      "url": "https://ai-office-red.vercel.app/brand/pavutyna/refs/rollup-inet.jpg",
+      "width": 600,
+      "height": 1440
+    }
+  ]
+}
