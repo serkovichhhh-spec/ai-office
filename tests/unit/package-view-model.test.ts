@@ -21,16 +21,39 @@ describe("package view model (run page 1.3)", () => {
     expect(creativesFrom([{ statement: "x", validation: "y" }])).toBeNull();
     expect(creativesFrom("text")).toBeNull();
   });
-  it("owner checklist uses the reviewer's fix (not raw JSON), most severe first", () => {
+  it("owner checklist: topics with ready answers, most severe first, no raw JSON", () => {
     const items = ownerChecklist(pkg);
-    expect(items.map((x) => x.severity)).toEqual(["critical", "major", "minor"]);
-    expect(items[0].text).toMatch(/^Додати офіційні специфікації/);
+    expect(items.map((x) => [x.severity, x.area])).toEqual([["critical", "Специфікації форматів"], ["major", "Лого й маскот"], ["minor", "Юридичний текст"]]);
+    expect(items.every((x) => x.answers.length > 0)).toBe(true);
     expect(items.some((x) => x.text.includes("\"width\""))).toBe(false);
-    expect(items[1].area).toBe("Виконуваність");
   });
-  it("excluded claims and answer template", () => {
+  it("merges the real 9-item escalation into a few topics and strips «[Відповідальний…]»", () => {
+    const real = {
+      blocking_questions: [
+        "[Відповідальний: власник/бренд-менеджер; строк: 2026-10-28] Надайте оригінальні файли білого лого та маскота з реальними asset_id, версіями й підтвердженням прав.",
+        "[Відповідальний: ads_specialist; строк: 2026-10-28] Згенеруйте коди l.pavutyna.com/s/<код> для кожної пари креатив × плейсмент (3 креативи × Instagram/Facebook feed, stories, Telegram).",
+        "[Відповідальний: власник; строк: 2026-10-28] Підтвердіть, що «НЕЗЛАМНИЙ ГІГАБІТ» і «Поторгуємось?» діють увесь період кампанії.",
+        "[Відповідальний: юрист; строк: 2026-10-28] Погодьте скорочені умови акцій для банера та мінімальний кегль/кількість рядків юрблоку, або рішення винести повні умови на посадкову.",
+        "[Відповідальний: ads_specialist; строк: 2026-10-28] Підтвердіть точний список плейсментів і надайте чинні офіційні вимоги Meta/Telegram (як pinned knowledge) для розмірів, ваги, safe-area.",
+      ],
+      review: { open_issues: [
+        { severity: "critical", criterion: "evidence", fix: "Або додати чинне pinned knowledge з офіційними специфікаціями Meta/Telegram і коректні refs для кожного формату." },
+        { severity: "major", criterion: "execution", fix: "Отримати від власника реальні ідентифікатори/версії оригінальних файлів лого й маскота з підтвердженими правами." },
+        { severity: "major", criterion: "execution", fix: "Додати як блокери з відповідальними: підтвердження чинності обох промо на період флайту, юридичне погодження умов." },
+        { severity: "major", criterion: "specialist", fix: "Розробити здійсненну мобільну композицію юридичного блоку для 1:1, 4:5 і 9:16." },
+      ] },
+    };
+    const items = ownerChecklist(real);
+    expect(items.length).toBeLessThanOrEqual(5);
+    expect(items.map((x) => x.area).sort()).toEqual(["Лого й маскот", "Специфікації форматів", "Трекінг-коди", "Чинність акцій", "Юридичний текст"].sort());
+    expect(items.some((x) => x.text.startsWith("["))).toBe(false);
+    expect(items.find((x) => x.area === "Лого й маскот")!.merged).toBe(2);
+  });
+  it("excluded claims and a template prefilled with default answers", () => {
     expect(excludedClaims(pkg)).toEqual(["«100+ годин роботи без світла»", "Порівняння з конкурентами"]);
-    expect(answerTemplate(ownerChecklist(pkg))).toMatch(/^1\. Доказовість: .+\n {3}Відповідь: /);
+    const t = answerTemplate(ownerChecklist(pkg));
+    expect(t.split("\n")[0]).toMatch(/^1\. Специфікації форматів: Бери затверджені знання/);
+    expect(t).not.toMatch(/Відповідь:\s*$/m);
   });
   it("one sentence per state", () => {
     expect(ownerState("needs_approval", "escalated", 3).kind).toBe("answer");

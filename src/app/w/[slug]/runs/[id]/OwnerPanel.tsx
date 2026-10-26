@@ -1,4 +1,5 @@
 import type { OwnerItem, OwnerState } from "@/lib/ui/package-view-model";
+import { AnswerChips } from "./AnswerChips";
 
 export interface ChainStep { key: string; label: string; state: "done" | "active" | "wait" | "bad" }
 
@@ -23,24 +24,24 @@ export function OwnerBanner({ state, chain }: { state: OwnerState; chain: ChainS
   );
 }
 
-export function OwnerChecklist({ items, excluded, reviewSummary }: { items: OwnerItem[]; excluded: string[]; reviewSummary?: string }) {
+export function OwnerChecklist({ items, excluded, reviewSummary, interactive = true }: { items: OwnerItem[]; excluded: string[]; reviewSummary?: string; interactive?: boolean }) {
   if (!items.length && !excluded.length) return null;
-  const top = items.slice(0, 6);
-  const rest = items.slice(6);
   const row = (x: OwnerItem, i: number) => (
     <li key={i} className={`todo ${x.severity}`}>
       <span className="sev">{SEV[x.severity]}</span>
-      <div><span className="muted small">{x.area}</span><p>{x.text}</p></div>
+      <div>
+        <b className="todo-title">{x.area}{x.merged > 1 ? <span className="muted small"> · {x.merged} зауваження</span> : null}</b>
+        <p className="muted small">{x.text}</p>
+        {interactive && <AnswerChips area={x.area} answers={x.answers} />}
+      </div>
     </li>
   );
   return (
     <section className="panel" aria-labelledby="todo-title">
-      <div className="panel-head"><h2 id="todo-title">Що від тебе потрібно</h2>{items.length > 0 && <span className="muted small">{items.length} пунктів</span>}</div>
-      {reviewSummary && <p className="small muted" style={{ marginBottom: 10 }}>Рецензент: {reviewSummary}</p>}
-      {top.length > 0 && <ol className="todos">{top.map(row)}</ol>}
-      {rest.length > 0 && (
-        <details className="quiet"><summary>Ще {rest.length}</summary><ol className="todos">{rest.map((x, i) => row(x, i + 6))}</ol></details>
-      )}
+      <div className="panel-head"><h2 id="todo-title">Що від тебе потрібно</h2>{items.length > 0 && <span className="muted small">{items.length} {items.length === 1 ? "тема" : items.length < 5 ? "теми" : "тем"}</span>}</div>
+      {interactive && items.length > 0 && <p className="small muted" style={{ marginBottom: 10 }}>Натисни відповідь — вона додасться в коментар. ✓ — відповідь за замовчуванням.</p>}
+      {items.length > 0 && <ol className="todos">{items.map(row)}</ol>}
+      {reviewSummary && <details className="quiet"><summary>Висновок рецензента</summary><p className="small" style={{ marginTop: 6 }}>{reviewSummary}</p></details>}
       {excluded.length > 0 && (
         <details className="quiet">
           <summary>Прибрано з текстів, поки не підтвердиш ({excluded.length})</summary>

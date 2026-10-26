@@ -118,7 +118,9 @@ export default async function RunPage({ params }: { params: Promise<{ slug: stri
     : undefined;
   const state = ownerState(d.run.status, pkgV1?.outcome, checklist.length, workingText);
   const steps = new Map<string, ChainStep>();
-  for (const s of d.steps) {
+  // Only the current cycle: everything after the last owner revision, without technical packaging.
+  const lastRevision = d.steps.map((s) => s.step_key).lastIndexOf("revision_intake");
+  for (const s of d.steps.slice(lastRevision + 1).filter((s) => s.step_key !== "package")) {
     const st: ChainStep["state"] = s.status === "succeeded" ? "done" : s.status === "running" || s.status === "awaiting_agent" ? "active" : s.status === "failed" ? "bad" : "wait";
     steps.set(s.step_key, { key: s.step_key, label: stepLabel(s.step_key), state: st });
   }
@@ -154,7 +156,10 @@ export default async function RunPage({ params }: { params: Promise<{ slug: stri
       <div className="cols">
         <div>
           {decide && <div className="mobile-first-decision"><DecisionPanel {...decide} /></div>}
-          <OwnerChecklist items={checklist} excluded={excluded} reviewSummary={pkgV1?.review?.summary} />
+          {active
+            ? checklist.length > 0 && <details className="panel quiet-panel"><summary>Питання до попередньої версії ({checklist.length}) — команда вже над ними працює</summary>
+                <OwnerChecklist items={checklist} excluded={[]} interactive={false} /></details>
+            : <OwnerChecklist items={checklist} excluded={excluded} reviewSummary={pkgV1?.review?.summary} />}
 
           <section className="panel" aria-labelledby="deliv-title">
             <div className="panel-head"><h2 id="deliv-title">{latest ? "Результат" : "Чернетка"}</h2></div>
@@ -227,7 +232,9 @@ export default async function RunPage({ params }: { params: Promise<{ slug: stri
                 {d.approvals.map((a) => (
                   <li key={a.id} className="row" style={{ display: "block" }}>
                     <b>{DECISION[a.decision]}</b> <span className="muted small">{when(a.created_at)}{a.by_me ? "" : ", учасник команди"}</span>
-                    {a.rationale && <p className="small" style={{ whiteSpace: "pre-line" }}>{a.rationale}</p>}
+                    {a.rationale && (a.rationale.length > 160
+                      ? <details><summary className="small">{a.rationale.slice(0, 120).replace(/\s+/g, " ")}…</summary><p className="small" style={{ whiteSpace: "pre-line" }}>{a.rationale}</p></details>
+                      : <p className="small" style={{ whiteSpace: "pre-line" }}>{a.rationale}</p>)}
                   </li>
                 ))}
               </ul>

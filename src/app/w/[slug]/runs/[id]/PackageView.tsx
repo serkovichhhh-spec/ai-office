@@ -33,7 +33,13 @@ export function PackageView({ pkg }: { pkg: PackageV1 }) {
   const main = sections.filter((s) => typeof s.content !== "string" && !PRODUCTION.test(s.kind));
   return (
     <>
-      {lead.map((s) => <p key={s.kind} className="lead">{String(s.content)}</p>)}
+      {lead.map((s) => {
+        const t = String(s.content);
+        const cut = t.split(/(?<=[.!?])\s/).slice(0, 2).join(" ");
+        return cut.length < t.length - 20
+          ? <details key={s.kind} className="lead-more"><summary className="lead">{cut} <span className="more">Детальніше</span></summary><p className="lead">{t.slice(cut.length).trim()}</p></details>
+          : <p key={s.kind} className="lead">{t}</p>;
+      })}
       {main.map((s) => {
         const creatives = creativesFrom(s.content);
         return (
